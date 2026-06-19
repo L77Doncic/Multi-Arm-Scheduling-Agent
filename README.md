@@ -106,12 +106,20 @@ Multi-Arm-Scheduling-Agent/
 │   ├── simulation_config.yaml         # 仿真配置
 │   └── evaluation_config.yaml         # 评估配置
 ├── docs/
-│   ├── design/
-│   │   ├── architecture.md            # 系统架构设计
-│   │   └── harness_design.md          # Harness框架设计
-│   └── reports/
-│       ├── simulation_report.md       # 仿真测试报告
-│       └── evaluation_report.md       # 评估对比报告
+│   └── source/
+│       ├── index.md                   # 文档首页
+│       ├── quickstart.md             # 快速开始
+│       ├── concepts.md               # 核心概念
+│       ├── tasks.md                  # 任务分解
+│       ├── scheduling.md             # 资源分配
+│       ├── code_generation.md        # 代码生成
+│       ├── simulation.md             # 仿真接口
+│       ├── evaluation.md             # 评估指标
+│       ├── harness.md                # Harness框架
+│       ├── configuration.md          # 配置说明
+│       ├── api_reference.md          # API参考
+│       ├── simulation_report.md      # 仿真测试报告
+│       └── evaluation_report.md      # 评估对比报告
 ├── scripts/
 │   ├── run_simulation.py              # 仿真运行脚本
 │   └── evaluate.py                    # 评估脚本
@@ -251,10 +259,15 @@ export OPENAI_API_KEY="your-key"
 
 ## 📖 文档
 
-- [系统架构设计](docs/design/architecture.md) — 分层架构、模块职责、数据流
-- [Harness框架设计](docs/design/harness_design.md) — 5大模块详细设计、接口规范
-- [仿真测试报告](docs/reports/simulation_report.md) — 执行结果、代码示例
-- [评估对比报告](docs/reports/evaluation_report.md) — Agent vs 基线方法对比
+- [快速开始](docs/source/quickstart.md) — 5分钟安装运行
+- [核心概念](docs/source/concepts.md) — 任务、臂、原语、Harness
+- [任务分解](docs/source/tasks.md) — 自然语言→结构化任务
+- [代码生成](docs/source/code_generation.md) — 原子原语与动态组合
+- [仿真接口](docs/source/simulation.md) — Mock与Isaac Sim
+- [评估报告](docs/source/evaluation_report.md) — Agent vs 基线对比
+- [Harness框架](docs/source/harness.md) — 闭环反馈与异常处理
+- [配置说明](docs/source/configuration.md) — YAML配置详解
+- [API参考](docs/source/api_reference.md) — 类与函数接口
 
 ## 🤝 贡献
 

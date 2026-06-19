@@ -105,12 +105,20 @@ Multi-Arm-Scheduling-Agent/
 │   ├── simulation_config.yaml         # Simulation configuration
 │   └── evaluation_config.yaml         # Evaluation configuration
 ├── docs/
-│   ├── design/
-│   │   ├── architecture.md            # System architecture
-│   │   └── harness_design.md          # Harness framework design
-│   └── reports/
-│       ├── simulation_report.md       # Simulation test report
-│       └── evaluation_report.md       # Evaluation comparison report
+│   └── source/
+│       ├── index.md                   # Documentation home
+│       ├── quickstart.md             # Quick start guide
+│       ├── concepts.md               # Core concepts
+│       ├── tasks.md                  # Task decomposition
+│       ├── scheduling.md             # Resource allocation
+│       ├── code_generation.md        # Code generation
+│       ├── simulation.md             # Simulation interfaces
+│       ├── evaluation.md             # Evaluation metrics
+│       ├── harness.md                # Harness framework
+│       ├── configuration.md          # Configuration guide
+│       ├── api_reference.md          # API reference
+│       ├── simulation_report.md      # Simulation test report
+│       └── evaluation_report.md      # Evaluation comparison report
 ├── scripts/
 │   ├── run_simulation.py              # Simulation runner
 │   └── evaluate.py                    # Evaluation script
@@ -250,10 +258,15 @@ Each scenario includes complete task lists, dependency graphs, robot arm definit
 
 ## Documentation
 
-- [System Architecture](docs/design/architecture.md) — Layered architecture, module responsibilities, data flow
-- [Harness Framework Design](docs/design/harness_design.md) — 5-module detailed design, interface specifications
-- [Simulation Test Report](docs/reports/simulation_report.md) — Execution results, generated code examples
-- [Evaluation Comparison Report](docs/reports/evaluation_report.md) — Agent vs baseline methods comparison
+- [Quickstart](docs/source/quickstart.md) — Get running in 5 minutes
+- [Concepts](docs/source/concepts.md) — Tasks, arms, primitives, Harness
+- [Task Decomposition](docs/source/tasks.md) — Natural language to structured tasks
+- [Code Generation](docs/source/code_generation.md) — Atomic primitives & dynamic composition
+- [Simulation](docs/source/simulation.md) — Mock & Isaac Sim interfaces
+- [Evaluation Report](docs/source/evaluation_report.md) — Agent vs baselines
+- [Harness Framework](docs/source/harness.md) — Feedback loop & exception handling
+- [Configuration](docs/source/configuration.md) — YAML config reference
+- [API Reference](docs/source/api_reference.md) — Classes & functions
 
 ## Contributing
 

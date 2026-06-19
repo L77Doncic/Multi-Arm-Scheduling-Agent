@@ -46,16 +46,21 @@ class AnthropicClient(LLMClient):
 
         self._anthropic = _anthropic
 
-        api_key = config.api_key or os.environ.get("ANTHROPIC_API_KEY")
+        api_key = (
+            config.api_key
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        )
         if not api_key:
             raise ValueError(
                 "An Anthropic API key must be provided via config.api_key or "
                 "the ANTHROPIC_API_KEY environment variable."
             )
 
+        base_url = config.api_base or os.environ.get("ANTHROPIC_BASE_URL")
         client_kwargs: Dict[str, Any] = {"api_key": api_key}
-        if config.api_base:
-            client_kwargs["base_url"] = config.api_base
+        if base_url:
+            client_kwargs["base_url"] = base_url
 
         self._client = _anthropic.Anthropic(**client_kwargs)
 
