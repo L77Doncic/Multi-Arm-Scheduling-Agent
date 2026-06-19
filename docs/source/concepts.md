@@ -185,7 +185,8 @@ graph LR
 
 | 仿真器 | 环境要求 | 用途 |
 |--------|---------|------|
-| **MockSimulator** | 无特殊要求 | 开发测试、CI/CD、无GPU环境 |
-| IsaacSim | NVIDIA GPU + Omniverse | 物理精确仿真、真实验证 |
+| **MockSimulator** | **无特殊要求（CPU即可）** | 开发测试、CI/CD、日常使用 |
+| IsaacSim | NVIDIA GPU + Omniverse（可选） | 仅在需要物理精确仿真时 |
 
-Mock仿真器允许在任何环境下完成开发和测试，Isaac Sim用于最终的物理验证。
+Mock仿真器允许在任何环境下完成开发和测试。**系统核心功能不依赖GPU**。
+Isaac Sim仅作为可选的物理精确仿真层，用于最终的碰撞检测和力学验证。

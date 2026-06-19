@@ -132,8 +132,9 @@ Multi-Arm-Scheduling-Agent/
 ### Requirements
 
 - Python ≥ 3.10
-- (Optional) NVIDIA GPU + Isaac Sim 2023.1+ for physics simulation
-- (Optional) OpenAI/Anthropic API Key for LLM-driven mode
+- **No GPU required** — Core system (task decomposition, resource allocation, code generation, mock simulation) runs on CPU
+- (Optional) OpenAI/Anthropic API Key for LLM-driven mode (falls back to heuristic mode without API)
+- (Optional) NVIDIA GPU + Isaac Sim only needed for physics-accurate simulation
 
 ### Installation
 

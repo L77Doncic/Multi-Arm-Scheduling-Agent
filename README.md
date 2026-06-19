@@ -133,8 +133,9 @@ Multi-Arm-Scheduling-Agent/
 ### 环境要求
 
 - Python ≥ 3.10
-- （可选）NVIDIA GPU + Isaac Sim 2023.1+ 用于真实物理仿真
-- （可选）OpenAI/Anthropic API Key 用于LLM驱动模式
+- **无需GPU** — 系统核心（任务分解、资源分配、代码生成、Mock仿真）均在CPU上运行
+- （可选）OpenAI/Anthropic API Key 用于LLM驱动模式（无API时自动回退启发式模式）
+- （可选）NVIDIA GPU + Isaac Sim 仅在需要物理精确仿真时使用
 
 ### 安装
 
