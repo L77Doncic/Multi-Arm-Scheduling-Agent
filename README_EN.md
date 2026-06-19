@@ -244,17 +244,23 @@ Simulation → Collect Results → Analyze Performance → Adjust Strategy → R
 
 ## Datasets
 
-### MRTA-Benchmark
+### MRTA-Benchmark (APEX-MR)
 
-Source: [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR)
+Source: [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR) — Carnegie Mellon University, RSS 2025
 
-| Scenario | Arms | Workpieces | Stations | Optimal Makespan |
-|----------|------|------------|----------|-----------------|
-| Simple Pick-and-Place | 2 | 2 | 4 | 16.0s |
-| Inspection Pipeline | 3 | 2 | 4 | 22.0s |
-| Dual-Line Assembly | 3 | 4 | 4 | 20.0s |
+Paper: [APEX-MR: Multi-Robot Asynchronous Planning and Execution for Cooperative Assembly](https://arxiv.org/abs/2503.15836)
 
-Each scenario includes complete task lists, dependency graphs, robot arm definitions, and MILP-optimal schedules as the unified baseline.
+Contains 13 dual-arm LEGO assembly tasks: test, R, S, cliff, bridge, rss, faucet, tower, vessel, fish_high, guitar, big_chair, stairs_rotated
+
+**Dataset is NOT committed to git. Download it manually:**
+
+```bash
+python scripts/download_dataset.py
+# Or manually:
+git clone --depth 1 https://github.com/intelligent-control-lab/APEX-MR.git /tmp/APEX-MR
+mkdir -p data/datasets/MRTA-Benchmark
+cp /tmp/APEX-MR/config/lego_tasks/assembly_tasks/*.json data/datasets/MRTA-Benchmark/
+```
 
 ## Documentation
 

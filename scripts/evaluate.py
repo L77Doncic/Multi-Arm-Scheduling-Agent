@@ -35,7 +35,38 @@ def setup_logging(verbose: bool = False):
 
 
 def load_benchmark_dataset(dataset_path: str) -> list:
-    """Load benchmark scenarios from JSON dataset."""
+    """Load benchmark scenarios from JSON file or MRTA-Benchmark directory."""
+    path = Path(dataset_path)
+
+    # If it's a directory, try MRTA-Benchmark loader
+    if path.is_dir():
+        try:
+            from evaluation.mrta_loader import MRTABenchmarkLoader, get_optimal_makespans
+            loader = MRTABenchmarkLoader(str(path))
+            mrta_tasks = loader.load_all()
+            optimal = get_optimal_makespans()
+
+            scenarios = []
+            for task in mrta_tasks:
+                config = loader.task_to_scenario_config(task, num_arms=2)
+                scenario_data = config['scenario']
+                scenarios.append({
+                    'id': task.task_id,
+                    'name': f"APEX-MR: {task.name}",
+                    'instruction': scenario_data['instruction'],
+                    'tasks': scenario_data.get('tasks', []),
+                    'arms': scenario_data['robot_arms'],
+                    'optimal_makespan': optimal.get(task.task_id, 0),
+                    'config': scenario_data,
+                    'source': 'APEX-MR',
+                    'num_bricks': task.num_bricks,
+                })
+            return scenarios
+        except Exception as e:
+            logger.warning("MRTA-Benchmark loader failed: %s", e)
+            return []
+
+    # If it's a JSON file
     with open(dataset_path, 'r') as f:
         data = json.load(f)
     return data.get('scenarios', [])

@@ -408,24 +408,36 @@ class TestScenarioData:
         assert len(scenario['stations']) >= 5
         assert len(scenario['workpieces']) >= 3
 
-    def test_mrta_benchmark_loads(self):
-        path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'datasets', 'mrta_benchmark.json')
-        if not os.path.exists(path):
-            pytest.skip("Dataset file not found")
-        with open(path) as f:
-            data = json.load(f)
-        assert data['dataset'] == 'MRTA-Benchmark'
-        assert len(data['scenarios']) >= 3
+    def test_mrta_benchmark_loader(self):
+        """Test MRTA-Benchmark loader with real APEX-MR data."""
+        dataset_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'datasets', 'MRTA-Benchmark')
+        if not os.path.isdir(dataset_dir):
+            pytest.skip("MRTA-Benchmark not downloaded. Run: python scripts/download_dataset.py")
+        import importlib
+        mrta_loader = importlib.import_module("evaluation.mrta_loader")
+        MRTABenchmarkLoader = mrta_loader.MRTABenchmarkLoader
+        get_optimal_makespans = mrta_loader.get_optimal_makespans
+        loader = MRTABenchmarkLoader(dataset_dir)
+        tasks = loader.load_all()
+        assert len(tasks) >= 10  # APEX-MR has 13 tasks
+        optimal = get_optimal_makespans()
+        assert len(optimal) >= 10
 
-    def test_mrta_scenario_has_optimal(self):
-        path = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'datasets', 'mrta_benchmark.json')
-        if not os.path.exists(path):
-            pytest.skip("Dataset file not found")
-        with open(path) as f:
-            data = json.load(f)
-        for scenario in data['scenarios']:
-            assert 'optimal_makespan' in scenario
-            assert scenario['optimal_makespan'] > 0
+    def test_mrta_task_to_scenario(self):
+        """Test converting APEX-MR task to scenario config."""
+        dataset_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'datasets', 'MRTA-Benchmark')
+        if not os.path.isdir(dataset_dir):
+            pytest.skip("MRTA-Benchmark not downloaded")
+        import importlib
+        mrta_loader = importlib.import_module("evaluation.mrta_loader")
+        loader = mrta_loader.MRTABenchmarkLoader(dataset_dir)
+        task = loader.load_task("test")  # Smallest task
+        config = loader.task_to_scenario_config(task, num_arms=2)
+        scenario = config['scenario']
+        assert len(scenario['stations']) >= 3
+        assert len(scenario['robot_arms']) >= 2
+        assert 'instruction' in scenario
+        assert scenario['source'] == 'APEX-MR'
 
 
 # ============================================================

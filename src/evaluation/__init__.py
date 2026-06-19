@@ -25,7 +25,12 @@ from evaluation.metrics import (
     MetricsCalculator,
     TaskEntry,
 )
-from evaluation.visualizer import Visualizer
+
+# Visualizer requires matplotlib — lazy import to avoid hard dependency
+try:
+    from evaluation.visualizer import Visualizer
+except ImportError:
+    Visualizer = None  # type: ignore[misc,assignment]
 
 __all__ = [
     # metrics

@@ -57,15 +57,29 @@ execution_log = [
 
 ### 加载MRTA-Benchmark
 
-```python
-from evaluation.benchmark import BenchmarkRunner
+首先下载数据集：
 
-runner = BenchmarkRunner(config={})
-scenarios = runner.load_dataset("data/datasets/mrta_benchmark.json")
-
-for s in scenarios:
-    print(f"{s.id}: {s.name} — {len(s.tasks)} tasks, optimal={s.optimal_makespan}s")
+```bash
+python scripts/download_dataset.py
 ```
+
+然后加载：
+
+```python
+from evaluation.mrta_loader import MRTABenchmarkLoader, get_optimal_makespans
+
+loader = MRTABenchmarkLoader("data/datasets/MRTA-Benchmark")
+tasks = loader.load_all()
+optimal = get_optimal_makespans()
+
+for task in tasks:
+    print(f"{task.task_id}: {task.name} — {task.num_bricks} bricks, "
+          f"optimal={optimal.get(task.task_id, 'N/A')}s")
+```
+
+数据集来源：[APEX-MR](https://github.com/intelligent-control-lab/APEX-MR) (RSS 2025, Carnegie Mellon University)
+
+包含13个LEGO组装任务：big_chair, bridge, cliff, faucet, fish_high, guitar, R, rss, S, stairs_rotated, test, tower, vessel
 
 ### 运行对比评估
 

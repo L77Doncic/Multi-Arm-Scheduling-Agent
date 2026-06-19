@@ -64,13 +64,33 @@ TASK DETAILS:
   ...
 ```
 
+## 下载MRTA-Benchmark数据集（可选）
+
+评估需要真实工业数据集时，下载 APEX-MR 的 LEGO 组装任务：
+
+```bash
+python scripts/download_dataset.py
+```
+
+这会将13个LEGO组装任务文件下载到 `data/datasets/MRTA-Benchmark/`。
+
+或手动下载：
+
+```bash
+git clone --depth 1 https://github.com/intelligent-control-lab/APEX-MR.git /tmp/APEX-MR
+mkdir -p data/datasets/MRTA-Benchmark
+cp /tmp/APEX-MR/config/lego_tasks/assembly_tasks/*.json data/datasets/MRTA-Benchmark/
+```
+
+> 数据集文件不会提交到git（外部依赖，需用户自行下载）。
+
 ## 运行评估
 
 ```bash
-# MRTA-Benchmark全量评估
-python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json
+# MRTA-Benchmark全量评估（需先下载数据集）
+python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
 
-# 单场景评估
+# 单场景评估（无需下载数据集）
 python scripts/evaluate.py --scenario data/scenarios/assembly_line_4station.yaml
 ```
 

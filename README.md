@@ -245,17 +245,33 @@ export OPENAI_API_KEY="your-key"
 
 ## 🎯 数据集
 
-### MRTA-Benchmark
+### MRTA-Benchmark (APEX-MR)
 
-来源: [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR)
+来源: [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR) — Carnegie Mellon University, RSS 2025
 
-| Scenario | Arms | Workpieces | Stations | Optimal Makespan |
-|----------|------|------------|----------|-----------------|
-| Simple Pick-and-Place | 2 | 2 | 4 | 16.0s |
-| Inspection Pipeline | 3 | 2 | 4 | 22.0s |
-| Dual-Line Assembly | 3 | 4 | 4 | 20.0s |
+论文: [APEX-MR: Multi-Robot Asynchronous Planning and Execution for Cooperative Assembly](https://arxiv.org/abs/2503.15836)
 
-每个场景包含完整的任务列表、依赖关系、机械臂定义和MILP最优调度作为基准。
+包含13个LEGO双臂组装任务：
+
+| Task | Bricks | Task | Bricks |
+|------|--------|------|--------|
+| test | 少量 | tower | 中等 |
+| R | 少量 | S | 少量 |
+| cliff | 中等 | bridge | 中等 |
+| rss | 中等 | faucet | 中等 |
+| vessel | 较多 | fish_high | 较多 |
+| guitar | 较多 | big_chair | 较多 |
+| stairs_rotated | 较多 | | |
+
+**数据集不提交到git，需用户自行下载：**
+
+```bash
+python scripts/download_dataset.py
+# 或手动：
+git clone --depth 1 https://github.com/intelligent-control-lab/APEX-MR.git /tmp/APEX-MR
+mkdir -p data/datasets/MRTA-Benchmark
+cp /tmp/APEX-MR/config/lego_tasks/assembly_tasks/*.json data/datasets/MRTA-Benchmark/
+```
 
 ## 📖 文档
 
