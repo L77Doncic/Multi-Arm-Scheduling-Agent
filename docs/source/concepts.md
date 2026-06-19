@@ -6,6 +6,8 @@
 
 系统由四层组成：
 
+![Architecture](assets/architecture.png)
+
 ```
 用户输入 (自然语言指令 + 场景配置)
     │
