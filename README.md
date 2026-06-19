@@ -132,10 +132,18 @@ Multi-Arm-Scheduling-Agent/
 
 ### 环境要求
 
+**必需：**
 - Python ≥ 3.10
-- **无需GPU** — 系统核心（任务分解、资源分配、代码生成、Mock仿真）均在CPU上运行
-- （可选）OpenAI/Anthropic API Key 用于LLM驱动模式（无API时自动回退启发式模式）
-- （可选）NVIDIA GPU + Isaac Sim 仅在需要物理精确仿真时使用
+- **NVIDIA GPU (RTX 3070+, 8GB+ VRAM)** — Isaac Sim/Omniverse 仿真验证需要
+- NVIDIA Driver 535+
+- Ubuntu 20.04/22.04 LTS 或 Windows 10/11
+
+**可选：**
+- OpenAI/Anthropic API Key 用于LLM驱动模式（无API时自动回退启发式模式）
+
+**无GPU时：**
+- 可使用 MockSimulator 进行开发调试（不含物理仿真）
+- 可使用云端GPU实例（NVIDIA A10G/L40S）运行Isaac Sim
 
 ### 安装
 

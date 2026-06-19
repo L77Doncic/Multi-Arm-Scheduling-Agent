@@ -181,12 +181,17 @@ graph LR
 
 系统选择动态代码生成，因为工业场景千变万化，固定技能库无法满足所有需求。
 
-### 为什么提供Mock仿真器？
+### 仿真器选择
 
 | 仿真器 | 环境要求 | 用途 |
 |--------|---------|------|
-| **MockSimulator** | **无特殊要求（CPU即可）** | 开发测试、CI/CD、日常使用 |
-| IsaacSim | NVIDIA GPU + Omniverse（可选） | 仅在需要物理精确仿真时 |
+| **MockSimulator** | CPU即可 | 开发调试、CI/CD、逻辑验证 |
+| **IsaacSimInterface** | **NVIDIA RTX GPU (8GB+)** | 最终仿真验证（任务要求） |
 
-Mock仿真器允许在任何环境下完成开发和测试。**系统核心功能不依赖GPU**。
-Isaac Sim仅作为可选的物理精确仿真层，用于最终的碰撞检测和力学验证。
+**任务要求**：系统需"接入Isaac Sim、Omniverse或Isaac Lab仿真接口完成执行验证"。
+Isaac Sim基于Omniverse平台，**必须使用NVIDIA RTX GPU**（最低RTX 3070）。
+
+- 开发阶段：用MockSimulator在CPU上验证调度逻辑
+- 最终验证：用Isaac Sim在GPU上进行物理仿真（碰撞检测、力学模拟）
+
+无GPU时可使用云端GPU实例（如AWS EC2 G5/P4d，NVIDIA A10G/A100）。

@@ -131,10 +131,18 @@ Multi-Arm-Scheduling-Agent/
 
 ### Requirements
 
+**Required:**
 - Python ≥ 3.10
-- **No GPU required** — Core system (task decomposition, resource allocation, code generation, mock simulation) runs on CPU
-- (Optional) OpenAI/Anthropic API Key for LLM-driven mode (falls back to heuristic mode without API)
-- (Optional) NVIDIA GPU + Isaac Sim only needed for physics-accurate simulation
+- **NVIDIA GPU (RTX 3070+, 8GB+ VRAM)** — Required for Isaac Sim/Omniverse simulation verification
+- NVIDIA Driver 535+
+- Ubuntu 20.04/22.04 LTS or Windows 10/11
+
+**Optional:**
+- OpenAI/Anthropic API Key for LLM-driven mode (falls back to heuristic mode without API)
+
+**Without GPU:**
+- MockSimulator available for development/debugging (no physics simulation)
+- Cloud GPU instances (NVIDIA A10G/L40S) can run Isaac Sim
 
 ### Installation
 

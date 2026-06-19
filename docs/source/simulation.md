@@ -6,20 +6,25 @@
 
 | 特性 | MockSimulator | IsaacSimInterface |
 |------|--------------|-------------------|
-| 环境要求 | **无特殊要求（CPU即可）** | NVIDIA GPU + Omniverse |
-| 物理精度 | 软件模拟 | 物理引擎精确 |
+| 环境要求 | CPU即可 | **NVIDIA RTX GPU (8GB+ VRAM)** |
+| 物理精度 | 软件模拟（无物理引擎） | RTX渲染 + PhysX物理引擎 |
 | 执行速度 | 快（可加速） | 实时或略慢 |
-| 用途 | 开发测试、CI/CD、**日常使用** | 最终验证、物理仿真 |
-| 故障模拟 | 可配置概率 | 真实物理碰撞 |
+| 用途 | 开发调试、CI/CD | **最终仿真验证（必需）** |
+| 故障模拟 | 可配置概率 | 真实物理碰撞检测 |
 
-!!! tip "GPU不是必需的"
-    系统的核心功能（任务分解、资源分配、代码生成、闭环反馈）完全不依赖GPU。
-    MockSimulator在CPU上运行，足以验证调度逻辑的正确性。
-    仅在需要精确物理仿真（碰撞检测、力学模拟）时才需要Isaac Sim + GPU。
+!!! warning "GPU是必需的"
+    任务要求"接入Isaac Sim、Omniverse或Isaac Lab仿真接口完成执行验证"。
+    Isaac Sim基于NVIDIA Omniverse平台，**必须使用RTX GPU**（最低RTX 3070, 8GB VRAM）。
+
+    - ❌ GTX系列不支持（需要RTX的光线追踪核心）
+    - ❌ 集成显卡/AMD显卡不支持
+    - ✅ RTX 3070/3080/3090/4070/4080/4090 均可
+
+    MockSimulator仅用于开发阶段的逻辑验证，**不能替代Isaac Sim的物理仿真**。
 
 ## MockSimulator
 
-软件仿真器，无需GPU即可运行。模拟机械臂操作的时序和状态变化。
+软件仿真器，无需GPU。用于开发阶段的调度逻辑验证，**不含物理引擎**。
 
 ### 基本用法
 
@@ -85,26 +90,41 @@ for entry in sim._trace:
 
 ## IsaacSimInterface
 
-NVIDIA Isaac Sim 接口。当 Isaac Sim 未安装时，自动降级到 MockSimulator。
+NVIDIA Isaac Sim 接口。**需要NVIDIA RTX GPU和Omniverse环境。**
+
+### 安装Isaac Sim
+
+```bash
+# 方式一：Omniverse Launcher（推荐）
+# 从 https://developer.nvidia.com/isaac-sim 下载
+
+# 方式二：pip安装
+pip install isaacsim-kernel
+pip install isaacsim-app
+```
+
+### 使用
 
 ```python
 from simulation.isaac_sim import IsaacSimInterface
 
 sim = IsaacSimInterface(config={
-    "headless": True,
-    "device": "cuda:0",
+    "headless": True,      # 无头模式（不需要显示器）
+    "device": "cuda:0",    # GPU设备
 })
-sim.initialize()  # 若Isaac不可用，自动使用MockSimulator
+sim.initialize()           # 需要RTX GPU
 sim.load_scene(scene_config)
-
-# 接口与MockSimulator完全一致
 result = sim.execute_action("arm_001", action)
-
 sim.close()
 ```
 
-!!! tip
-    即使在没有GPU的环境，`IsaacSimInterface` 也能正常工作——它会静默降级到 `MockSimulator`。
+!!! warning "Isaac Sim硬件要求"
+    - GPU: NVIDIA RTX 3070+ (8GB+ VRAM)
+    - Driver: NVIDIA 535+
+    - RAM: 32GB+ (推荐64GB)
+    - 存储: 50GB+ SSD
+
+    若未安装Isaac Sim，`IsaacSimInterface` 会降级到 `MockSimulator`，但**不提供物理仿真验证**。
 
 ## SceneBuilder
 

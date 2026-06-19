@@ -2,6 +2,23 @@
 
 本指南帮助你在5分钟内安装并运行多机械臂调度系统。
 
+## 环境要求
+
+| 要求 | 说明 |
+|------|------|
+| Python | ≥ 3.10 |
+| **GPU** | **NVIDIA RTX 3070+ (8GB+ VRAM)** — Isaac Sim仿真需要 |
+| NVIDIA Driver | 535+ |
+| OS | Ubuntu 20.04/22.04 或 Windows 10/11 |
+| RAM | 32GB+ (推荐64GB) |
+
+!!! warning "GPU是必需的"
+    任务要求接入Isaac Sim进行仿真验证。Isaac Sim基于Omniverse平台，**必须使用NVIDIA RTX GPU**。
+    GTX系列、集成显卡、AMD显卡均不支持。
+
+    无GPU时可用MockSimulator进行开发调试，但无法完成物理仿真验证。
+    也可使用云端GPU实例（AWS EC2 G5、Google Cloud A2 等）。
+
 ## 安装
 
 ### 从源码安装
