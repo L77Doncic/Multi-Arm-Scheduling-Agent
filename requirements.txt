@@ -1,0 +1,73 @@
+# Core dependencies
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# LLM and AI
+openai>=1.0.0
+anthropic>=0.18.0
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-anthropic>=0.1.0
+transformers>=4.35.0
+torch>=2.0.0
+
+# Robotics and Simulation
+pyyaml>=6.0
+networkx>=3.0
+scipy>=1.10.0
+numpy>=1.24.0
+
+# Isaac Sim / Omniverse (optional - install separately)
+# omni.isaac.core
+# omni.isaac.kit
+# omni.isaac.lab
+
+# Task scheduling and optimization
+ortools>=9.8
+pulp>=2.7.0
+networkx>=3.0
+
+# Data processing
+h5py>=3.9.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Testing and evaluation
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+coverage>=7.3.0
+
+# Documentation
+sphinx>=7.0.0
+sphinx-rtd-theme>=1.3.0
+myst-parser>=2.0.0
+
+# Utilities
+tqdm>=4.65.0
+colorama>=0.4.6
+rich>=13.0.0
+click>=8.1.0
+python-dotenv>=1.0.0
+
+# Visualization
+plotly>=5.18.0
+bokeh>=3.3.0
+graphviz>=0.20.0
+
+# Configuration
+hydra-core>=1.3.0
+omegaconf>=2.3.0
+
+# Logging
+loguru>=0.7.0
+tensorboard>=2.15.0
+
+# Type checking
+mypy>=1.7.0
+pylint>=3.0.0
+black>=23.0.0
+isort>=5.12.0

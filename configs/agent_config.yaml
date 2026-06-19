@@ -1,0 +1,165 @@
+# Multi-Arm Scheduling Agent Configuration
+
+# LLM Configuration
+llm:
+  # Provider: openai, anthropic, local
+  provider: "openai"
+
+  # Model selection
+  model: "gpt-4-turbo"
+
+  # API settings
+  api_base: "https://api.openai.com/v1"
+  api_key_env: "OPENAI_API_KEY"
+
+  # Generation parameters
+  temperature: 0.7
+  max_tokens: 4096
+  top_p: 0.9
+
+  # Retry settings
+  max_retries: 3
+  retry_delay: 1.0
+
+# Robot Arms Configuration
+robot_arms:
+  - id: "arm_001"
+    name: "Left Arm"
+    type: "6-DOF"
+    capabilities:
+      - "pick"
+      - "place"
+      - "move"
+      - "assemble"
+    workspace:
+      x_min: -1.0
+      x_max: 1.0
+      y_min: -1.0
+      y_max: 1.0
+      z_min: 0.0
+      z_max: 2.0
+    max_payload: 5.0  # kg
+    max_speed: 2.0    # m/s
+
+  - id: "arm_002"
+    name: "Right Arm"
+    type: "6-DOF"
+    capabilities:
+      - "pick"
+      - "place"
+      - "move"
+      - "assemble"
+      - "tighten"
+    workspace:
+      x_min: -1.0
+      x_max: 1.0
+      y_min: -1.0
+      y_max: 1.0
+      z_min: 0.0
+      z_max: 2.0
+    max_payload: 5.0  # kg
+    max_speed: 2.0    # m/s
+
+  - id: "arm_003"
+    name: "Top Arm"
+    type: "4-DOF"
+    capabilities:
+      - "pick"
+      - "place"
+      - "inspect"
+    workspace:
+      x_min: -0.5
+      x_max: 0.5
+      y_min: -0.5
+      y_max: 0.5
+      z_min: 1.0
+      z_max: 3.0
+    max_payload: 2.0  # kg
+    max_speed: 1.5    # m/s
+
+# Task Configuration
+task:
+  # Maximum number of subtasks
+  max_subtasks: 20
+
+  # Default timeout for each task (seconds)
+  default_timeout: 30.0
+
+  # Enable parallel execution
+  parallel_execution: true
+
+  # Maximum concurrent tasks
+  max_concurrent_tasks: 3
+
+# Harness Configuration
+harness:
+  # Feedback loop settings
+  feedback:
+    enabled: true
+    interval: 1.0  # seconds
+    metrics:
+      - "task_status"
+      - "resource_utilization"
+      - "error_rate"
+
+  # Validation settings
+  validation:
+    enabled: true
+    strict_mode: false
+    auto_retry: true
+    max_retries: 3
+
+  # Exception handling
+  exception_handling:
+    enabled: true
+    log_errors: true
+    notify_on_critical: true
+    recovery_strategies:
+      - "retry"
+      - "skip"
+      - "fallback"
+
+# Evaluation Configuration
+evaluation:
+  # Metrics to calculate
+  metrics:
+    - "makespan"
+    - "task_success_rate"
+    - "resource_utilization"
+    - "constraint_violations"
+
+  # Benchmark settings
+  benchmark:
+    enabled: true
+    dataset: "MRTA-Benchmark"
+    compare_with_baseline: true
+
+  # Visualization
+  visualization:
+    enabled: true
+    generate_plots: true
+    save_videos: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "outputs/logs/agent.log"
+  console: true
+
+# Output Configuration
+output:
+  # Directory for output files
+  base_dir: "outputs"
+
+  # Save execution history
+  save_history: true
+  history_format: "json"
+
+  # Save generated code
+  save_code: true
+  code_dir: "outputs/generated_code"
+
+  # Save evaluation results
+  save_results: true
+  results_dir: "outputs/results"
