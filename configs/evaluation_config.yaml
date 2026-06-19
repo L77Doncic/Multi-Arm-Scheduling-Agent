@@ -1,0 +1,44 @@
+# Evaluation Configuration
+
+evaluation:
+  # Metrics to compute
+  metrics:
+    - makespan
+    - task_success_rate
+    - resource_utilization
+    - constraint_violations
+
+  # Benchmark datasets
+  datasets:
+    - name: "MRTA-Benchmark"
+      path: "data/datasets/mrta_benchmark.json"
+      format: "json"
+
+  # Baseline methods for comparison
+  baselines:
+    - name: "random"
+      description: "Random task-to-arm assignment"
+    - name: "greedy"
+      description: "Greedy list scheduling (LPT heuristic)"
+    - name: "optimal"
+      description: "Optimal schedule from dataset (MILP solver)"
+
+  # Statistical analysis
+  statistics:
+    confidence_level: 0.95
+    num_runs: 5  # Number of runs for statistical significance
+    compute_std: true
+
+  # Visualization
+  visualization:
+    generate_gantt: true
+    generate_utilization_chart: true
+    generate_comparison_chart: true
+    generate_html_report: true
+    output_dir: "outputs/results"
+
+  # Output settings
+  output:
+    save_raw_results: true
+    save_aggregate: true
+    format: "json"

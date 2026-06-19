@@ -1,0 +1,100 @@
+{
+  "dataset": "MRTA-Benchmark",
+  "version": "1.0",
+  "description": "Multi-Robot Task Allocation benchmark for industrial assembly scenarios",
+  "source": "https://github.com/intelligent-control-lab/APEX-MR",
+  "citation": "MRTA-Benchmark: Multi-Robot Task Allocation Benchmark for Industrial Applications",
+  "scenarios": [
+    {
+      "id": "mrta_scenario_01",
+      "name": "Simple Pick-and-Place",
+      "num_arms": 2,
+      "num_workpieces": 2,
+      "num_stations": 4,
+      "instruction": "Pick two workpieces from the feed station, move them to the assembly area, assemble them together, and place the finished product at the output station.",
+      "tasks": [
+        {"id": "t1", "name": "pick_wp1", "station": "feed", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t2", "name": "pick_wp2", "station": "feed", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t3", "name": "move_wp1", "station": "assembly", "duration": 3.0, "required_caps": ["move"], "dependencies": ["t1"]},
+        {"id": "t4", "name": "move_wp2", "station": "assembly", "duration": 3.0, "required_caps": ["move"], "dependencies": ["t2"]},
+        {"id": "t5", "name": "assemble", "station": "assembly", "duration": 8.0, "required_caps": ["assemble"], "dependencies": ["t3", "t4"]},
+        {"id": "t6", "name": "output", "station": "output", "duration": 3.0, "required_caps": ["place"], "dependencies": ["t5"]}
+      ],
+      "arms": [
+        {"id": "arm1", "capabilities": ["pick", "move", "place", "assemble"]},
+        {"id": "arm2", "capabilities": ["pick", "move", "place", "assemble"]}
+      ],
+      "optimal_makespan": 16.0,
+      "optimal_schedule": [
+        {"task": "t1", "arm": "arm1", "start": 0, "end": 2},
+        {"task": "t2", "arm": "arm2", "start": 0, "end": 2},
+        {"task": "t3", "arm": "arm1", "start": 2, "end": 5},
+        {"task": "t4", "arm": "arm2", "start": 2, "end": 5},
+        {"task": "t5", "arm": "arm1", "start": 5, "end": 13},
+        {"task": "t6", "arm": "arm1", "start": 13, "end": 16}
+      ]
+    },
+    {
+      "id": "mrta_scenario_02",
+      "name": "Inspection Pipeline",
+      "num_arms": 3,
+      "num_workpieces": 2,
+      "num_stations": 4,
+      "instruction": "Two workpieces need to be picked, pre-processed, inspected, and packaged. The inspection station can only handle one workpiece at a time.",
+      "tasks": [
+        {"id": "t1", "name": "pick_A", "station": "feed", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t2", "name": "pick_B", "station": "feed", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t3", "name": "prep_A", "station": "prep", "duration": 4.0, "required_caps": ["move", "place"], "dependencies": ["t1"]},
+        {"id": "t4", "name": "prep_B", "station": "prep", "duration": 4.0, "required_caps": ["move", "place"], "dependencies": ["t2"]},
+        {"id": "t5", "name": "inspect_A", "station": "inspect", "duration": 5.0, "required_caps": ["inspect"], "dependencies": ["t3"]},
+        {"id": "t6", "name": "inspect_B", "station": "inspect", "duration": 5.0, "required_caps": ["inspect"], "dependencies": ["t4", "t5"]},
+        {"id": "t7", "name": "package_A", "station": "output", "duration": 3.0, "required_caps": ["pick", "place"], "dependencies": ["t5"]},
+        {"id": "t8", "name": "package_B", "station": "output", "duration": 3.0, "required_caps": ["pick", "place"], "dependencies": ["t6"]}
+      ],
+      "arms": [
+        {"id": "arm1", "capabilities": ["pick", "move", "place"]},
+        {"id": "arm2", "capabilities": ["pick", "move", "place"]},
+        {"id": "arm3", "capabilities": ["inspect", "pick", "place"]}
+      ],
+      "optimal_makespan": 22.0,
+      "optimal_schedule": [
+        {"task": "t1", "arm": "arm1", "start": 0, "end": 2},
+        {"task": "t2", "arm": "arm2", "start": 0, "end": 2},
+        {"task": "t3", "arm": "arm1", "start": 2, "end": 6},
+        {"task": "t4", "arm": "arm2", "start": 2, "end": 6},
+        {"task": "t5", "arm": "arm3", "start": 6, "end": 11},
+        {"task": "t7", "arm": "arm1", "start": 11, "end": 14},
+        {"task": "t6", "arm": "arm3", "start": 11, "end": 16},
+        {"task": "t8", "arm": "arm2", "start": 16, "end": 19}
+      ]
+    },
+    {
+      "id": "mrta_scenario_03",
+      "name": "Dual-Line Assembly",
+      "num_arms": 3,
+      "num_workpieces": 4,
+      "num_stations": 4,
+      "instruction": "Four workpieces in two parallel lines. Each line has pick, process, and output stations. Arms must be shared between lines efficiently.",
+      "tasks": [
+        {"id": "t1", "name": "pick_A1", "station": "feed1", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t2", "name": "pick_A2", "station": "feed1", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t3", "name": "pick_B1", "station": "feed2", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t4", "name": "pick_B2", "station": "feed2", "duration": 2.0, "required_caps": ["pick"], "dependencies": []},
+        {"id": "t5", "name": "process_A1", "station": "process1", "duration": 6.0, "required_caps": ["assemble"], "dependencies": ["t1"]},
+        {"id": "t6", "name": "process_A2", "station": "process1", "duration": 6.0, "required_caps": ["assemble"], "dependencies": ["t2"]},
+        {"id": "t7", "name": "process_B1", "station": "process2", "duration": 5.0, "required_caps": ["assemble"], "dependencies": ["t3"]},
+        {"id": "t8", "name": "process_B2", "station": "process2", "duration": 5.0, "required_caps": ["assemble"], "dependencies": ["t4"]},
+        {"id": "t9", "name": "output_A1", "station": "output", "duration": 2.0, "required_caps": ["place"], "dependencies": ["t5"]},
+        {"id": "t10", "name": "output_A2", "station": "output", "duration": 2.0, "required_caps": ["place"], "dependencies": ["t6"]},
+        {"id": "t11", "name": "output_B1", "station": "output", "duration": 2.0, "required_caps": ["place"], "dependencies": ["t7"]},
+        {"id": "t12", "name": "output_B2", "station": "output", "duration": 2.0, "required_caps": ["place"], "dependencies": ["t8"]}
+      ],
+      "arms": [
+        {"id": "arm1", "capabilities": ["pick", "place", "assemble"]},
+        {"id": "arm2", "capabilities": ["pick", "place", "assemble"]},
+        {"id": "arm3", "capabilities": ["pick", "place", "assemble"]}
+      ],
+      "optimal_makespan": 20.0
+    }
+  ]
+}

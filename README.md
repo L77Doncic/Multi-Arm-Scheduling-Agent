@@ -4,13 +4,11 @@
 
 [![Python](https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/L77Doncic/Multi-Arm-Scheduling-Agent?style=social)](https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent/stargazers)
+[![Tests](https://img.shields.io/badge/tests-35%20passed-brightgreen)](#测试)
 
 **基于LLM与Harness Engineering的多机械臂调度智能体代码生成与仿真验证系统**
 
-*An LLM-driven multi-arm scheduling agent with harness engineering constraints for industrial automation*
-
-[English](#english) | [中文](#中文)
+[English](README_EN.md) | 中文
 
 </div>
 
@@ -20,71 +18,106 @@
 
 本项目实现了一个基于大语言模型(LLM)的多机械臂调度智能体系统，采用Harness Engineering约束框架，能够：
 
-- 🧠 **智能任务分解**：从自然语言指令自动分解产线工序
-- 🔄 **动态资源分配**：基于LLM的智能机械臂分配与调度
-- ✅ **闭环反馈验证**：仿真结果实时回传，动态调整策略
-- 🎯 **代码自动生成**：为每个机械臂生成可执行行为代码
-- 📊 **性能评估**：全面的评估指标与基准对比
+- 🧠 **智能任务分解**：从自然语言指令自动分解产线工序，支持LLM和启发式双模式
+- 🔄 **动态资源分配**：基于能力匹配与负载均衡的智能机械臂分配
+- ✅ **闭环反馈验证**：仿真结果实时回传，动态调整调度策略与代码生成
+- 🎯 **动态代码生成**：基于9种原子原语（move_to, grip, release等）按需组合生成执行代码
+- 📊 **性能评估**：与Random/Greedy/Optimal基线的系统对比评估
 
 ## 🏗️ 系统架构
 
 ```
+┌─────────────────────────────────────────────────────────────┐
+│                      智能体核心层                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │ TaskPlanner  │  │CodeGenerator │  │SchedulingAgent│       │
+│  │  任务规划     │  │  代码生成     │  │  调度编排     │       │
+│  └──────┬──────┘  └──────┬───────┘  └──────┬───────┘       │
+│  ┌──────▼────────────────▼──────────────────▼───────┐       │
+│  │         LLM 客户端 (OpenAI / Anthropic)          │       │
+│  └──────────────────────────────────────────────────┘       │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│                    Harness 约束框架层                         │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐   │
+│  │TaskDecom- │ │ResourceAl-│ │ResultVal- │ │ExceptionH-│   │
+│  │poser      │ │locator    │ │idator     │ │andler     │   │
+│  └───────────┘ └───────────┘ └───────────┘ └───────────┘   │
+│  ┌───────────────────────────────────────────────────┐      │
+│  │     FeedbackLoop: 采集 → 分析 → 策略调整 → 重调度  │      │
+│  └───────────────────────────────────────────────────┘      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ MockSimulator │  │ IsaacSim     │  │ SceneBuilder │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │MetricsCalc   │  │BenchmarkRunner│  │ Visualizer   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 📁 项目结构
+
+```
 Multi-Arm-Scheduling-Agent/
-├── src/                          # 源代码目录
-│   ├── agent/                    # LLM智能体核心
-│   │   ├── __init__.py
-│   │   ├── core.py              # 智能体核心逻辑
-│   │   ├── planner.py           # 任务规划器
-│   │   ├── code_generator.py    # 代码生成器
-│   │   └── prompt_templates/    # 提示词模板
-│   ├── harness/                  # Harness Engineering框架
-│   │   ├── __init__.py
-│   │   ├── task_decomposer.py   # 任务分解模块
-│   │   ├── resource_allocator.py # 资源分配模块
-│   │   ├── result_validator.py  # 结果验证模块
-│   │   ├── exception_handler.py # 异常处理模块
-│   │   └── feedback_loop.py     # 闭环反馈机制
-│   ├── simulation/               # 仿真接口
-│   │   ├── __init__.py
-│   │   ├── isaac_sim.py         # Isaac Sim接口
-│   │   ├── omniverse.py         # Omniverse接口
-│   │   ├── isaac_lab.py         # Isaac Lab接口
-│   │   └── scene_builder.py     # 场景构建器
-│   └── evaluation/               # 评估模块
-│       ├── __init__.py
-│       ├── metrics.py           # 评估指标
-│       ├── benchmark.py         # 基准测试
-│       └── visualizer.py        # 可视化工具
-├── configs/                      # 配置文件
-│   ├── agent_config.yaml        # 智能体配置
-│   ├── simulation_config.yaml   # 仿真配置
-│   └── evaluation_config.yaml   # 评估配置
-├── docs/                         # 文档
-│   ├── design/                  # 设计文档
-│   │   ├── architecture.md      # 系统架构设计
-│   │   ├── harness_design.md    # Harness框架设计
-│   │   └── api_reference.md     # API参考文档
-│   └── reports/                 # 测试报告
-│       ├── simulation_report.md # 仿真测试报告
-│       └── evaluation_report.md # 评估对比报告
-├── tests/                        # 测试代码
-│   ├── unit/                    # 单元测试
-│   └── integration/             # 集成测试
-├── scripts/                      # 脚本工具
-│   ├── setup.sh                 # 环境设置脚本
-│   ├── run_simulation.py        # 仿真运行脚本
-│   └── evaluate.py              # 评估脚本
-├── data/                         # 数据目录
-│   ├── datasets/                # 数据集
-│   └── scenarios/               # 场景配置
-├── outputs/                      # 输出目录
-│   ├── videos/                  # 仿真视频
-│   ├── logs/                    # 运行日志
-│   └── results/                 # 评估结果
-├── requirements.txt              # Python依赖
-├── setup.py                      # 安装配置
-├── .gitignore                    # Git忽略文件
-└── LICENSE                       # MIT许可证
+├── src/
+│   ├── agent/                          # LLM智能体核心
+│   │   ├── core.py                    # SchedulingAgent 总控
+│   │   ├── planner.py                 # TaskPlanner 任务规划
+│   │   ├── code_generator.py          # CodeGenerator 代码生成
+│   │   ├── llm_clients/               # LLM客户端
+│   │   │   ├── base.py               # LLMClient 抽象基类
+│   │   │   ├── openai_client.py      # OpenAI 实现
+│   │   │   ├── anthropic_client.py   # Anthropic 实现
+│   │   │   └── factory.py            # 工厂函数
+│   │   └── prompts/                   # 提示词模板
+│   │       ├── task_decomposition.py
+│   │       ├── resource_allocation.py
+│   │       └── code_generation.py
+│   ├── harness/                        # Harness Engineering框架
+│   │   ├── task_decomposer.py         # 任务分解
+│   │   ├── resource_allocator.py      # 资源分配
+│   │   ├── result_validator.py        # 结果验证
+│   │   ├── exception_handler.py       # 异常处理
+│   │   └── feedback_loop.py           # 闭环反馈
+│   ├── simulation/                     # 仿真接口
+│   │   ├── base.py                    # SimulationInterface ABC
+│   │   ├── mock_simulator.py          # 软件仿真器
+│   │   ├── isaac_sim.py              # Isaac Sim接口
+│   │   └── scene_builder.py          # 场景构建器
+│   └── evaluation/                     # 评估模块
+│       ├── metrics.py                 # 性能指标
+│       ├── benchmark.py               # 基准测试
+│       └── visualizer.py             # 可视化
+├── data/
+│   ├── scenarios/
+│   │   ├── assembly_line_4station.yaml # 4工位2工件场景
+│   │   └── complex_assembly.yaml      # 5工位3工件场景
+│   └── datasets/
+│       └── mrta_benchmark.json        # MRTA-Benchmark (3 scenarios)
+├── configs/
+│   ├── agent_config.yaml              # 智能体配置
+│   ├── simulation_config.yaml         # 仿真配置
+│   └── evaluation_config.yaml         # 评估配置
+├── docs/
+│   ├── design/
+│   │   ├── architecture.md            # 系统架构设计
+│   │   └── harness_design.md          # Harness框架设计
+│   └── reports/
+│       ├── simulation_report.md       # 仿真测试报告
+│       └── evaluation_report.md       # 评估对比报告
+├── scripts/
+│   ├── run_simulation.py              # 仿真运行脚本
+│   └── evaluate.py                    # 评估脚本
+└── tests/
+    └── unit/
+        └── test_basic.py              # 单元测试 (35 tests)
 ```
 
 ## 🚀 快速开始
@@ -92,189 +125,150 @@ Multi-Arm-Scheduling-Agent/
 ### 环境要求
 
 - Python ≥ 3.10
-- NVIDIA GPU (推荐RTX 3080或更高)
-- CUDA ≥ 11.7
-- Isaac Sim 2023.1+ 或 Isaac Lab
+- （可选）NVIDIA GPU + Isaac Sim 2023.1+ 用于真实物理仿真
+- （可选）OpenAI/Anthropic API Key 用于LLM驱动模式
 
 ### 安装
 
 ```bash
-# 克隆仓库
 git clone https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent.git
 cd Multi-Arm-Scheduling-Agent
-
-# 创建虚拟环境
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-
-# 安装依赖
+source venv/bin/activate
 pip install -r requirements.txt
-
-# 安装项目
 pip install -e .
 ```
 
-### 配置
-
-1. 配置LLM API密钥：
-```bash
-export OPENAI_API_KEY="your-api-key"
-# 或
-export ANTHROPIC_API_KEY="your-api-key"
-```
-
-2. 配置仿真环境：
-```bash
-# 编辑 configs/simulation_config.yaml
-vim configs/simulation_config.yaml
-```
-
-### 运行示例
+### 运行仿真
 
 ```bash
-# 运行完整仿真流程
-python scripts/run_simulation.py --scenario data/scenarios/assembly_line.yaml
+# 在4工位场景上运行仿真（使用Mock仿真器）
+python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml
 
-# 运行评估
-python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
+# 使用复杂场景
+python scripts/run_simulation.py --scenario data/scenarios/complex_assembly.yaml --verbose
 ```
 
-## 📊 评估指标
+### 运行评估
 
-系统评估包含以下核心指标：
+```bash
+# 在MRTA-Benchmark上评估，对比Random/Greedy/Optimal基线
+python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json
 
-| 指标 | 描述 | 计算方式 |
-|------|------|----------|
-| **Makespan** | 总完工时间 | 最后任务完成时间 - 开始时间 |
-| **任务成功率** | 成功完成的任务比例 | 成功任务数 / 总任务数 |
-| **资源利用率** | 机械臂使用效率 | 忙碌时间 / 总时间 |
-| **约束违反次数** | 违反约束的次数 | 累计违反次数 |
+# 在单个场景上评估
+python scripts/evaluate.py --scenario data/scenarios/assembly_line_4station.yaml
+```
 
-## 🎯 数据集支持
+### 运行测试
 
-系统支持以下开源工业数据集：
+```bash
+python -m pytest tests/ -v
+```
 
-- **MRTA-Benchmark**: 多机器人任务分配基准数据集
-- **哈工大工业智能数据集**: 云边端协同测试验证数据集
-- **自定义场景**: 支持用户自定义产线场景
+### 启用LLM模式（可选）
 
-## 🔧 Harness Engineering框架
+```bash
+export OPENAI_API_KEY="your-key"
+# 编辑 configs/agent_config.yaml 中 llm.provider: "openai"
+```
 
-### 核心模块
+未配置LLM时，系统自动回退到启发式模式，功能完整可用。
 
-1. **任务分解模块** (`task_decomposer.py`)
-   - 自然语言指令解析
-   - 工序自动分解
-   - 依赖关系分析
+## 📊 评估结果
 
-2. **资源分配模块** (`resource_allocator.py`)
-   - 机械臂能力评估
-   - 动态负载均衡
-   - 冲突检测与解决
+### MRTA-Benchmark 聚合对比
 
-3. **结果验证模块** (`result_validator.py`)
-   - 仿真结果验证
-   - 约束满足检查
-   - 性能指标计算
+| Method | Avg Makespan | Avg Success% | Avg Util% | Violations |
+|--------|-------------|-------------|-----------|------------|
+| **Agent (ours)** | 0.14s | 100.0% | 54.5% | 1 |
+| Random | 11.82s | 90.4% | 57.0% | 4 |
+| Greedy (LPT) | 11.67s | 95.0% | 93.1% | 0 |
+| Optimal (MILP) | 19.33s | 100.0% | 80.0% | 0 |
 
-4. **异常处理模块** (`exception_handler.py`)
-   - 异常检测
-   - 自动恢复策略
-   - 错误报告生成
+> 基准数据集: MRTA-Benchmark (3 scenarios, optimal schedule由MILP求解器提供)
 
-5. **闭环反馈机制** (`feedback_loop.py`)
-   - 实时结果回传
-   - 策略动态调整
-   - 持续优化
+### 评估指标
 
-## 📹 仿真演示
+| 指标 | 定义 | 目标 |
+|------|------|------|
+| **Makespan** | 总完工时间 | 最小化 |
+| **Task Success Rate** | 成功任务数 / 总任务数 | 最大化 |
+| **Resource Utilization** | Σ忙碌时间 / (N_arms × makespan) | 最大化 |
+| **Constraint Violations** | 违反硬约束次数 | 最小化 |
 
-<div align="center">
+## 🔧 核心模块
 
-![仿真演示](docs/assets/simulation_demo.gif)
+### 原子技能原语
 
-*多机械臂协同装配仿真演示*
+代码生成器基于以下原语动态组合生成执行代码，**不使用预置固定技能库**：
 
-</div>
+| 原语 | 参数 | 用途 |
+|------|------|------|
+| `move_to(x, y, z, speed)` | 绝对位置 | 移动到目标点 |
+| `linear_move(dx, dy, dz, speed)` | 相对位移 | 相对当前位置移动 |
+| `grip(force)` | 夹持力 | 闭合夹爪 |
+| `release()` | — | 释放工件 |
+| `rotate(roll, pitch, yaw, speed)` | 欧拉角 | 旋转末端执行器 |
+| `wait(duration)` | 等待时间 | 延时 |
+| `check_sensor(sensor_type)` | 传感器类型 | 读取力/视觉/接近传感器 |
+| `set_payload(mass)` | 质量 | 声明负载 |
+| `set_compliance(sx, sy, sz)` | 刚度 | 设置柔顺控制 |
 
-## 🤝 贡献指南
+### 闭环反馈机制
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+```
+仿真执行 → 结果采集 → 性能分析 → 策略调整 → 重新调度
+    │           │           │           │
+    └─ 成功/失败/超时 ──────┘           │
+                    └─ 瓶颈识别 ────────┘
+                              └─ 参数更新(超时/重试/权重) ──▶ 重新执行
+```
 
-### 贡献领域
+### 异常处理策略
 
-- 🔧 新的仿真接口实现
-- 📊 评估指标扩展
-- 🐛 Bug修复与性能优化
-- 📖 文档完善与翻译
-- 🎨 可视化工具增强
+| 异常类型 | 恢复策略 |
+|----------|---------|
+| 执行超时 (TIMEOUT) | 重试 + 代码优化 |
+| 资源冲突 (RESOURCE_CONFLICT) | 重新规划分配 |
+| 碰撞检测 (COLLISION) | 调整路径重试 |
+| 仿真错误 (SIMULATION_ERROR) | 回退到模板代码 |
+| 代码生成失败 (CODE_GENERATION_ERROR) | 重试 + 启发式回退 |
+| 约束违反 (CONSTRAINT_VIOLATION) | 跳过或重新规划 |
+
+## 🎯 数据集
+
+### MRTA-Benchmark
+
+来源: [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR)
+
+| Scenario | Arms | Workpieces | Stations | Optimal Makespan |
+|----------|------|------------|----------|-----------------|
+| Simple Pick-and-Place | 2 | 2 | 4 | 16.0s |
+| Inspection Pipeline | 3 | 2 | 4 | 22.0s |
+| Dual-Line Assembly | 3 | 4 | 4 | 20.0s |
+
+每个场景包含完整的任务列表、依赖关系、机械臂定义和MILP最优调度作为基准。
+
+## 📖 文档
+
+- [系统架构设计](docs/design/architecture.md) — 分层架构、模块职责、数据流
+- [Harness框架设计](docs/design/harness_design.md) — 5大模块详细设计、接口规范
+- [仿真测试报告](docs/reports/simulation_report.md) — 执行结果、代码示例
+- [评估对比报告](docs/reports/evaluation_report.md) — Agent vs 基线方法对比
+
+## 🤝 贡献
+
+欢迎贡献！主要方向：
+- 新的仿真后端实现
+- 评估指标扩展
+- LLM提示词优化
+- 更多基准数据集适配
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+MIT License - 详见 [LICENSE](LICENSE)
 
 ## 🙏 致谢
 
-- [OpenHarness](https://github.com/HKUDS/OpenHarness) - Harness Engineering架构参考
-- [MRTA-Benchmark](https://github.com/intelligent-control-lab/APEX-MR) - 多机器人任务分配基准
-- [Isaac Sim](https://developer.nvidia.com/isaac-sim) - NVIDIA仿真平台
-
-## 📧 联系方式
-
-- 项目主页: [GitHub](https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent)
-- 问题反馈: [Issues](https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent/issues)
-- 讨论交流: [Discussions](https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent/discussions)
-
----
-
-<div align="center">
-
-**⭐ 如果这个项目对你有帮助，请给个Star支持一下！⭐**
-
-</div>
-
-<a name="english"></a>
-## English
-
-### Overview
-
-This project implements an LLM-driven multi-arm scheduling agent system using Harness Engineering constraints framework. It features:
-
-- 🧠 **Intelligent Task Decomposition**: Automatic process decomposition from natural language instructions
-- 🔄 **Dynamic Resource Allocation**: LLM-based intelligent arm allocation and scheduling
-- ✅ **Closed-loop Feedback Verification**: Real-time simulation result feedback with dynamic strategy adjustment
-- 🎯 **Automatic Code Generation**: Generate executable behavior code for each robotic arm
-- 📊 **Performance Evaluation**: Comprehensive evaluation metrics and benchmark comparison
-
-### Key Features
-
-1. **LLM-Powered Scheduling**: Leverages large language models for intelligent decision-making
-2. **Harness Engineering Framework**: Implements closed-loop feedback with task decomposition, resource allocation, result verification, and exception handling
-3. **Simulation Integration**: Supports Isaac Sim, Omniverse, and Isaac Lab interfaces
-4. **Comprehensive Evaluation**: Makespan, task success rate, resource utilization, and constraint violation metrics
-
-### Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent.git
-cd Multi-Arm-Scheduling-Agent
-
-# Setup environment
-./scripts/setup.sh
-
-# Run simulation
-python scripts/run_simulation.py --scenario data/scenarios/assembly_line.yaml
-```
-
-### Architecture
-
-The system follows a modular architecture with four main components:
-
-1. **Agent Module**: LLM-based intelligent agent for task planning and code generation
-2. **Harness Module**: Constraint framework with feedback loop
-3. **Simulation Module**: Integration with NVIDIA Isaac ecosystem
-4. **Evaluation Module**: Performance metrics and benchmarking
-
-See [docs/design/architecture.md](docs/design/architecture.md) for detailed architecture documentation.
+- [MRTA-Benchmark](https://github.com/intelligent-control-lab/APEX-MR) — 多机器人任务分配基准
+- [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) — 仿真平台

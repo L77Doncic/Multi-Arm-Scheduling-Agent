@@ -1,0 +1,44 @@
+# Simulation Configuration
+
+simulation:
+  # Backend: "mock" (software simulation) or "isaac" (NVIDIA Isaac Sim)
+  backend: "mock"
+
+  # Physics settings
+  physics:
+    timestep: 0.01  # seconds
+    gravity: [0, 0, -9.81]
+    solver_iterations: 10
+
+  # Mock simulator settings
+  mock:
+    failure_probability: 0.05
+    record_trace: true
+    time_acceleration: 100.0  # Speed up simulation by this factor
+
+  # Isaac Sim settings
+  isaac_sim:
+    headless: true
+    device: "cuda:0"
+    scene_path: "scenes/default.usd"
+    robot_asset_path: "assets/robots/"
+
+  # Scene settings
+  scene:
+    bounds:
+      x_min: -5.0
+      x_max: 10.0
+      y_min: -5.0
+      y_max: 5.0
+      z_min: 0.0
+      z_max: 5.0
+
+    lighting:
+      type: "dome"
+      intensity: 1000
+
+  # Execution settings
+  execution:
+    max_steps: 10000
+    timeout: 300.0  # seconds
+    real_time_factor: 0.0  # 0 = as fast as possible
