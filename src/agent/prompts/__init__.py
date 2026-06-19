@@ -1,28 +1,15 @@
 """
-Prompt Templates for Multi-Arm Scheduling Agent.
+Prompts Module
 
-Contains reusable prompt functions for task decomposition, resource
-allocation, and code generation workflows.
+This module provides prompt templates for various LLM tasks.
 """
 
-from .task_decomposition import (
-    task_decompose_prompt,
-    dependency_analysis_prompt,
-)
-from .resource_allocation import (
-    resource_allocate_prompt,
-    conflict_resolve_prompt,
-)
-from .code_generation import (
-    code_generate_prompt,
-    code_refine_prompt,
-)
+from .task_decomposition import TaskDecompositionPrompts
+from .resource_allocation import ResourceAllocationPrompts
+from .code_generation import CodeGenerationPrompts
 
 __all__ = [
-    "task_decompose_prompt",
-    "dependency_analysis_prompt",
-    "resource_allocate_prompt",
-    "conflict_resolve_prompt",
-    "code_generate_prompt",
-    "code_refine_prompt",
+    'TaskDecompositionPrompts',
+    'ResourceAllocationPrompts',
+    'CodeGenerationPrompts',
 ]

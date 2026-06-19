@@ -1,228 +1,256 @@
 """
-OpenAI LLM client implementation.
+OpenAI LLM Client Implementation
 
-Uses the ``openai`` Python SDK to interact with the OpenAI Chat Completions
-API.  Supports free-form generation, structured JSON output (via response
-format), retry with exponential backoff, and optional ``tiktoken``-based
-token counting.
+This module implements the OpenAI API client for GPT models.
 """
 
-from __future__ import annotations
-
-import json
-import logging
 import os
-from typing import Any, Dict, Optional
+import logging
+from typing import Dict, List, Optional, Any
+from openai import AsyncOpenAI
 
-from .base import LLMClient, LLMConfig, estimate_token_count
+from .base import BaseLLMClient, LLMMessage, LLMResponse
 
 logger = logging.getLogger(__name__)
 
 
-class OpenAIClient(LLMClient):
-    """LLM client backed by the OpenAI Chat Completions API.
+class OpenAIClient(BaseLLMClient):
+    """
+    OpenAI API client implementation.
 
-    Parameters
-    ----------
-    config:
-        Client configuration.  ``config.model`` defaults to ``"gpt-4o"`` if
-        not set.
+    Supports GPT-4, GPT-4 Turbo, GPT-3.5 Turbo, and other OpenAI models.
     """
 
-    def __init__(self, config: Optional[LLMConfig] = None) -> None:
-        if config is None:
-            config = LLMConfig(model="gpt-4o")
+    # Pricing per 1K tokens (as of 2024)
+    PRICING = {
+        'gpt-4-turbo': {'input': 0.01, 'output': 0.03},
+        'gpt-4': {'input': 0.03, 'output': 0.06},
+        'gpt-4-32k': {'input': 0.06, 'output': 0.12},
+        'gpt-3.5-turbo': {'input': 0.0005, 'output': 0.0015},
+        'gpt-3.5-turbo-16k': {'input': 0.003, 'output': 0.004},
+    }
+
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize the OpenAI client.
+
+        Args:
+            config: Configuration dictionary with keys:
+                - api_key: OpenAI API key (or set OPENAI_API_KEY env var)
+                - model: Model name (default: 'gpt-4-turbo')
+                - base_url: Optional custom API base URL
+                - temperature: Sampling temperature (default: 0.7)
+                - max_tokens: Maximum tokens (default: 4096)
+        """
         super().__init__(config)
 
-        # Lazy-import so the rest of the project can load without openai.
-        try:
-            import openai as _openai  # noqa: F811
-        except ImportError as exc:
-            raise ImportError(
-                "The 'openai' package is required for OpenAIClient. "
-                "Install it with: pip install openai"
-            ) from exc
-
-        self._openai = _openai
-
-        api_key = config.api_key or os.environ.get("OPENAI_API_KEY")
+        # Get API key from config or environment
+        api_key = config.get('api_key') or os.environ.get('OPENAI_API_KEY')
         if not api_key:
             raise ValueError(
-                "An OpenAI API key must be provided via config.api_key or "
-                "the OPENAI_API_KEY environment variable."
+                "OpenAI API key must be provided in config or OPENAI_API_KEY environment variable"
             )
 
-        client_kwargs: Dict[str, Any] = {"api_key": api_key}
-        if config.api_base:
-            client_kwargs["base_url"] = config.api_base
-
-        self._client = _openai.OpenAI(**client_kwargs)
-
-        # Try to load tiktoken for accurate token counting.
-        self._tokenizer = None
-        try:
-            import tiktoken
-
-            self._tokenizer = tiktoken.encoding_for_model(config.model)
-            logger.debug("tiktoken tokenizer loaded for model %s", config.model)
-        except Exception:  # pragma: no cover – best effort
-            logger.debug(
-                "tiktoken not available for model %s; using heuristic token counting",
-                config.model,
-            )
-
-    # -- Public interface ---------------------------------------------------
-
-    def generate(self, prompt: str, **kwargs: Any) -> str:
-        """Generate a chat completion for *prompt*.
-
-        Parameters
-        ----------
-        prompt:
-            The user message content.
-        **kwargs:
-            Optional overrides: ``system_prompt``, ``temperature``,
-            ``max_tokens``, ``top_p``, ``timeout``.
-
-        Returns
-        -------
-        str
-            The assistant's response text.
-        """
-        return self._chat_completion(prompt, structured=False, **kwargs)
-
-    def generate_structured(
-        self, prompt: str, schema: Dict[str, Any], **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Generate a structured JSON response conforming to *schema*.
-
-        Uses OpenAI's ``response_format`` with ``type: "json_schema"`` when
-        available, falling back to prompt-based JSON extraction.
-
-        Parameters
-        ----------
-        prompt:
-            The user prompt (should request JSON output).
-        schema:
-            A JSON Schema dict.
-        **kwargs:
-            Optional overrides.
-
-        Returns
-        -------
-        dict
-            Parsed JSON response.
-        """
-        # Build an enhanced prompt that includes schema instructions.
-        schema_str = json.dumps(schema, indent=2)
-        enhanced_prompt = (
-            f"{prompt}\n\n"
-            f"You MUST respond with a single JSON object that conforms "
-            f"to the following JSON Schema:\n```json\n{schema_str}\n```\n\n"
-            f"Do NOT include any text outside the JSON object."
+        # Initialize client
+        base_url = config.get('base_url')
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url
         )
 
-        raw = self._chat_completion(
-            enhanced_prompt, structured=True, schema=schema, **kwargs
-        )
+        # Set model
+        self.model = config.get('model', 'gpt-4-turbo')
 
-        return self._extract_json(raw)
+        logger.info(f"OpenAI client initialized with model: {self.model}")
 
-    def count_tokens(self, text: str) -> int:
-        """Count tokens using tiktoken if available, else heuristic."""
-        if self._tokenizer is not None:
-            return len(self._tokenizer.encode(text))
-        return estimate_token_count(text)
-
-    def get_model_name(self) -> str:
-        return self._config.model
-
-    # -- Internal -----------------------------------------------------------
-
-    def _chat_completion(
+    async def chat(
         self,
-        prompt: str,
-        *,
-        structured: bool = False,
-        schema: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> str:
-        """Issue a chat-completion request with retry logic."""
-        temperature = kwargs.get("temperature", self._config.temperature)
-        max_tokens = kwargs.get("max_tokens", self._config.max_tokens)
-        top_p = kwargs.get("top_p", self._config.top_p)
-        timeout = kwargs.get("timeout", self._config.timeout)
-        system_prompt = kwargs.get(
-            "system_prompt",
-            "You are a helpful assistant for multi-arm robotic scheduling.",
-        )
+        messages: List[LLMMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a chat request to OpenAI.
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
+        Args:
+            messages: List of messages in the conversation.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional parameters:
+                - top_p: Nucleus sampling parameter
+                - frequency_penalty: Frequency penalty
+                - presence_penalty: Presence penalty
+                - stop: Stop sequences
 
-        request_kwargs: Dict[str, Any] = {
-            "model": self._config.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "top_p": top_p,
-            "timeout": timeout,
+        Returns:
+            LLMResponse object containing the response.
+        """
+        # Validate messages
+        if not self.validate_messages(messages):
+            raise ValueError("Invalid messages format")
+
+        # Prepare parameters
+        params = {
+            'model': self.model,
+            'messages': [msg.to_dict() for msg in messages],
+            'temperature': temperature or self.temperature,
+            'max_tokens': max_tokens or self.max_tokens,
+            'top_p': kwargs.get('top_p', self.top_p),
         }
 
-        # Attempt to use structured output via response_format.
-        if structured and schema is not None:
-            request_kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "structured_output",
-                    "strict": True,
-                    "schema": schema,
-                },
+        # Add optional parameters
+        if 'frequency_penalty' in kwargs:
+            params['frequency_penalty'] = kwargs['frequency_penalty']
+        if 'presence_penalty' in kwargs:
+            params['presence_penalty'] = kwargs['presence_penalty']
+        if 'stop' in kwargs:
+            params['stop'] = kwargs['stop']
+
+        try:
+            logger.debug(f"Sending chat request with {len(messages)} messages")
+
+            # Make API call
+            response = await self.client.chat.completions.create(**params)
+
+            # Extract response
+            choice = response.choices[0]
+            usage = {
+                'prompt_tokens': response.usage.prompt_tokens,
+                'completion_tokens': response.usage.completion_tokens,
+                'total_tokens': response.usage.total_tokens,
             }
 
-        def _call() -> str:
-            logger.debug(
-                "OpenAI request: model=%s, structured=%s",
-                self._config.model,
-                structured,
+            # Calculate cost
+            cost = self._calculate_cost(usage)
+            self._total_cost += cost
+
+            # Create response object
+            llm_response = LLMResponse(
+                content=choice.message.content,
+                model=response.model,
+                usage=usage,
+                finish_reason=choice.finish_reason,
+                metadata={'cost': cost}
             )
-            try:
-                response = self._client.chat.completions.create(
-                    **request_kwargs
-                )
-            except TypeError:
-                # The SDK may not support response_format with json_schema;
-                # retry without it.
-                if "response_format" in request_kwargs:
-                    logger.debug(
-                        "response_format not supported; retrying without it"
-                    )
-                    fallback_kw = {
-                        k: v
-                        for k, v in request_kwargs.items()
-                        if k != "response_format"
-                    }
-                    response = self._client.chat.completions.create(
-                        **fallback_kw
-                    )
-                else:
-                    raise
 
-            content = response.choices[0].message.content
-            if content is None:
-                raise ValueError("OpenAI returned an empty response.")
-            return content.strip()
+            # Update usage statistics
+            self._update_usage(llm_response)
 
-        # Retryable errors: rate-limit (429), server errors (5xx), timeouts.
-        import openai as _openai  # noqa: F811
+            logger.debug(
+                f"Chat response received: {usage['total_tokens']} tokens, "
+                f"${cost:.4f} cost"
+            )
 
-        retryable = (
-            _openai.RateLimitError,
-            _openai.APITimeoutError,
-            _openai.APIConnectionError,
-            _openai.InternalServerError,
-        )
+            return llm_response
 
-        return self._retry(_call, retryable_exceptions=retryable)
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            raise
+
+    async def complete(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a completion request to OpenAI.
+
+        Note: This converts the prompt to a chat message for compatibility.
+        OpenAI's completion API is deprecated for newer models.
+
+        Args:
+            prompt: The prompt text.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional parameters.
+
+        Returns:
+            LLMResponse object containing the response.
+        """
+        # Convert to chat format
+        messages = [self.create_user_message(prompt)]
+        return await self.chat(messages, temperature, max_tokens, **kwargs)
+
+    def _calculate_cost(self, usage: Dict[str, int]) -> float:
+        """
+        Calculate the cost of an API call.
+
+        Args:
+            usage: Dictionary with token usage information.
+
+        Returns:
+            Cost in USD.
+        """
+        pricing = self.PRICING.get(self.model, self.PRICING.get('gpt-4-turbo'))
+
+        input_cost = (usage['prompt_tokens'] / 1000) * pricing['input']
+        output_cost = (usage['completion_tokens'] / 1000) * pricing['output']
+
+        return input_cost + output_cost
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current model.
+
+        Returns:
+            Dictionary containing model information.
+        """
+        return {
+            'provider': 'openai',
+            'model': self.model,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+            'total_cost': self._total_cost,
+            'total_tokens': self._total_tokens,
+        }
+
+    async def stream_chat(
+        self,
+        messages: List[LLMMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        """
+        Stream a chat response from OpenAI.
+
+        Args:
+            messages: List of messages in the conversation.
+            temperature: Sampling temperature.
+            max_tokens: Maximum tokens to generate.
+            **kwargs: Additional parameters.
+
+        Yields:
+            Chunks of the response text.
+        """
+        # Validate messages
+        if not self.validate_messages(messages):
+            raise ValueError("Invalid messages format")
+
+        # Prepare parameters
+        params = {
+            'model': self.model,
+            'messages': [msg.to_dict() for msg in messages],
+            'temperature': temperature or self.temperature,
+            'max_tokens': max_tokens or self.max_tokens,
+            'top_p': kwargs.get('top_p', self.top_p),
+            'stream': True,
+        }
+
+        try:
+            logger.debug(f"Starting stream chat with {len(messages)} messages")
+
+            # Make streaming API call
+            stream = await self.client.chat.completions.create(**params)
+
+            # Yield chunks
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.error(f"OpenAI streaming error: {str(e)}")
+            raise

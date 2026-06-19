@@ -1,201 +1,304 @@
 """
-Anthropic LLM client implementation.
+Anthropic LLM Client Implementation
 
-Uses the ``anthropic`` Python SDK to interact with the Anthropic Messages API.
-Supports free-form generation, structured JSON output, retry with exponential
-backoff, and heuristic-based token counting.
+This module implements the Anthropic API client for Claude models.
 """
 
-from __future__ import annotations
-
-import json
-import logging
 import os
-from typing import Any, Dict, Optional
+import logging
+from typing import Dict, List, Optional, Any
+from anthropic import AsyncAnthropic
 
-from .base import LLMClient, LLMConfig, estimate_token_count
+from .base import BaseLLMClient, LLMMessage, LLMResponse, MessageRole
 
 logger = logging.getLogger(__name__)
 
-# Anthropic has a hard limit per request; keep a safety margin.
-_MAX_OUTPUT_TOKENS = 8192
 
+class AnthropicClient(BaseLLMClient):
+    """
+    Anthropic API client implementation.
 
-class AnthropicClient(LLMClient):
-    """LLM client backed by the Anthropic Messages API.
-
-    Parameters
-    ----------
-    config:
-        Client configuration.  ``config.model`` defaults to
-        ``"claude-sonnet-4-20250514"`` if not set.
+    Supports Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku, and other Claude models.
     """
 
-    def __init__(self, config: Optional[LLMConfig] = None) -> None:
-        if config is None:
-            config = LLMConfig(model="claude-sonnet-4-20250514")
+    # Pricing per 1K tokens (as of 2024)
+    PRICING = {
+        'claude-3-opus-20240229': {'input': 0.015, 'output': 0.075},
+        'claude-3-sonnet-20240229': {'input': 0.003, 'output': 0.015},
+        'claude-3-haiku-20240307': {'input': 0.00025, 'output': 0.00125},
+        'claude-2.1': {'input': 0.008, 'output': 0.024},
+        'claude-2.0': {'input': 0.008, 'output': 0.024},
+        'claude-instant-1.2': {'input': 0.0008, 'output': 0.0024},
+    }
+
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize the Anthropic client.
+
+        Args:
+            config: Configuration dictionary with keys:
+                - api_key: Anthropic API key (or set ANTHROPIC_API_KEY env var)
+                - model: Model name (default: 'claude-3-sonnet-20240229')
+                - base_url: Optional custom API base URL
+                - temperature: Sampling temperature (default: 0.7)
+                - max_tokens: Maximum tokens (default: 4096)
+        """
         super().__init__(config)
 
-        try:
-            import anthropic as _anthropic  # noqa: F811
-        except ImportError as exc:
-            raise ImportError(
-                "The 'anthropic' package is required for AnthropicClient. "
-                "Install it with: pip install anthropic"
-            ) from exc
-
-        self._anthropic = _anthropic
-
-        api_key = (
-            config.api_key
-            or os.environ.get("ANTHROPIC_API_KEY")
-            or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        )
+        # Get API key from config or environment
+        api_key = config.get('api_key') or os.environ.get('ANTHROPIC_API_KEY')
         if not api_key:
             raise ValueError(
-                "An Anthropic API key must be provided via config.api_key or "
-                "the ANTHROPIC_API_KEY environment variable."
+                "Anthropic API key must be provided in config or ANTHROPIC_API_KEY environment variable"
             )
 
-        base_url = config.api_base or os.environ.get("ANTHROPIC_BASE_URL")
-        client_kwargs: Dict[str, Any] = {"api_key": api_key}
-        if base_url:
-            client_kwargs["base_url"] = base_url
-
-        self._client = _anthropic.Anthropic(**client_kwargs)
-
-    # -- Public interface ---------------------------------------------------
-
-    def generate(self, prompt: str, **kwargs: Any) -> str:
-        """Generate a response for *prompt* using the Messages API.
-
-        Parameters
-        ----------
-        prompt:
-            The user message content.
-        **kwargs:
-            Optional overrides: ``system_prompt``, ``temperature``,
-            ``max_tokens``, ``top_p``, ``timeout``.
-
-        Returns
-        -------
-        str
-            The assistant's response text.
-        """
-        return self._messages_request(prompt, structured=False, **kwargs)
-
-    def generate_structured(
-        self, prompt: str, schema: Dict[str, Any], **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Generate a structured JSON response conforming to *schema*.
-
-        The schema is injected into the system prompt so the model knows
-        exactly what JSON shape to produce.
-
-        Parameters
-        ----------
-        prompt:
-            The user prompt.
-        schema:
-            A JSON Schema dict describing the expected output shape.
-        **kwargs:
-            Optional overrides.
-
-        Returns
-        -------
-        dict
-            Parsed JSON response.
-        """
-        schema_str = json.dumps(schema, indent=2)
-        enhanced_prompt = (
-            f"{prompt}\n\n"
-            f"You MUST respond with a single JSON object that conforms "
-            f"to the following JSON Schema:\n```json\n{schema_str}\n```\n\n"
-            f"Do NOT include any commentary, explanation, or markdown "
-            f"fences outside the JSON object itself."
+        # Initialize client
+        base_url = config.get('base_url')
+        self.client = AsyncAnthropic(
+            api_key=api_key,
+            base_url=base_url
         )
 
-        raw = self._messages_request(enhanced_prompt, structured=True, **kwargs)
+        # Set model
+        self.model = config.get('model', 'claude-3-sonnet-20240229')
 
-        return self._extract_json(raw)
+        logger.info(f"Anthropic client initialized with model: {self.model}")
 
-    def count_tokens(self, text: str) -> int:
-        """Estimate token count.
-
-        Anthropic does not ship a standalone tokenizer; this uses the shared
-        character-based heuristic.
+    def _convert_messages(
+        self,
+        messages: List[LLMMessage]
+    ) -> tuple[Optional[str], List[Dict[str, str]]]:
         """
-        return estimate_token_count(text)
+        Convert messages to Anthropic format.
 
-    def get_model_name(self) -> str:
-        return self._config.model
+        Anthropic requires:
+        - System message as a separate parameter
+        - Messages alternating between user and assistant
 
-    # -- Internal -----------------------------------------------------------
+        Args:
+            messages: List of LLMMessage objects.
 
-    def _messages_request(
+        Returns:
+            Tuple of (system_prompt, messages_list).
+        """
+        system_prompt = None
+        converted_messages = []
+
+        for msg in messages:
+            if msg.role == MessageRole.SYSTEM:
+                system_prompt = msg.content
+            else:
+                converted_messages.append({
+                    'role': msg.role.value,
+                    'content': msg.content
+                })
+
+        # Ensure messages alternate correctly
+        # Anthropic requires messages to start with user
+        if converted_messages and converted_messages[0]['role'] != 'user':
+            converted_messages.insert(0, {
+                'role': 'user',
+                'content': 'Please proceed with the task.'
+            })
+
+        return system_prompt, converted_messages
+
+    async def chat(
+        self,
+        messages: List[LLMMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a chat request to Anthropic.
+
+        Args:
+            messages: List of messages in the conversation.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional parameters:
+                - top_p: Nucleus sampling parameter
+                - top_k: Top-k sampling parameter
+                - stop_sequences: Stop sequences
+
+        Returns:
+            LLMResponse object containing the response.
+        """
+        # Validate messages
+        if not self.validate_messages(messages):
+            raise ValueError("Invalid messages format")
+
+        # Convert messages to Anthropic format
+        system_prompt, converted_messages = self._convert_messages(messages)
+
+        # Prepare parameters
+        params = {
+            'model': self.model,
+            'messages': converted_messages,
+            'temperature': temperature or self.temperature,
+            'max_tokens': max_tokens or self.max_tokens,
+        }
+
+        # Add system prompt if present
+        if system_prompt:
+            params['system'] = system_prompt
+
+        # Add optional parameters
+        if 'top_p' in kwargs:
+            params['top_p'] = kwargs['top_p']
+        if 'top_k' in kwargs:
+            params['top_k'] = kwargs['top_k']
+        if 'stop_sequences' in kwargs:
+            params['stop_sequences'] = kwargs['stop_sequences']
+
+        try:
+            logger.debug(f"Sending chat request with {len(messages)} messages")
+
+            # Make API call
+            response = await self.client.messages.create(**params)
+
+            # Extract response
+            usage = {
+                'prompt_tokens': response.usage.input_tokens,
+                'completion_tokens': response.usage.output_tokens,
+                'total_tokens': response.usage.input_tokens + response.usage.output_tokens,
+            }
+
+            # Calculate cost
+            cost = self._calculate_cost(usage)
+            self._total_cost += cost
+
+            # Create response object
+            llm_response = LLMResponse(
+                content=response.content[0].text,
+                model=response.model,
+                usage=usage,
+                finish_reason=response.stop_reason,
+                metadata={'cost': cost}
+            )
+
+            # Update usage statistics
+            self._update_usage(llm_response)
+
+            logger.debug(
+                f"Chat response received: {usage['total_tokens']} tokens, "
+                f"${cost:.4f} cost"
+            )
+
+            return llm_response
+
+        except Exception as e:
+            logger.error(f"Anthropic API error: {str(e)}")
+            raise
+
+    async def complete(
         self,
         prompt: str,
-        *,
-        structured: bool = False,
-        **kwargs: Any,
-    ) -> str:
-        """Issue a Messages API request with retry logic."""
-        temperature = kwargs.get("temperature", self._config.temperature)
-        max_tokens = min(
-            kwargs.get("max_tokens", self._config.max_tokens),
-            _MAX_OUTPUT_TOKENS,
-        )
-        top_p = kwargs.get("top_p", self._config.top_p)
-        timeout = kwargs.get("timeout", self._config.timeout)
-        system_prompt = kwargs.get(
-            "system_prompt",
-            "You are a helpful assistant for multi-arm robotic scheduling.",
-        )
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a completion request to Anthropic.
 
-        if structured:
-            system_prompt = (
-                f"{system_prompt}\n\n"
-                "You MUST always respond with valid JSON only. "
-                "Do not include any text outside the JSON object."
-            )
+        Note: This converts the prompt to a chat message for compatibility.
 
-        def _call() -> str:
-            logger.debug(
-                "Anthropic request: model=%s, structured=%s",
-                self._config.model,
-                structured,
-            )
-            response = self._client.messages.create(
-                model=self._config.model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                system=system_prompt,
-                messages=[{"role": "user", "content": prompt}],
-                timeout=timeout,
-            )
+        Args:
+            prompt: The prompt text.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional parameters.
 
-            # The response content is a list of blocks; concatenate text blocks.
-            text_parts = [
-                block.text
-                for block in response.content
-                if block.type == "text"
-            ]
-            if not text_parts:
-                raise ValueError(
-                    "Anthropic returned no text content in the response."
-                )
-            return "".join(text_parts).strip()
+        Returns:
+            LLMResponse object containing the response.
+        """
+        # Convert to chat format
+        messages = [self.create_user_message(prompt)]
+        return await self.chat(messages, temperature, max_tokens, **kwargs)
 
-        # Retryable errors: rate-limit, overloaded, API errors, timeouts.
-        import anthropic as _anthropic  # noqa: F811
+    def _calculate_cost(self, usage: Dict[str, int]) -> float:
+        """
+        Calculate the cost of an API call.
 
-        retryable = (
-            _anthropic.RateLimitError,
-            _anthropic.OverloadedError,
-            _anthropic.APITimeoutError,
-            _anthropic.APIConnectionError,
-            _anthropic.InternalServerError,
+        Args:
+            usage: Dictionary with token usage information.
+
+        Returns:
+            Cost in USD.
+        """
+        pricing = self.PRICING.get(
+            self.model,
+            self.PRICING.get('claude-3-sonnet-20240229')
         )
 
-        return self._retry(_call, retryable_exceptions=retryable)
+        input_cost = (usage['prompt_tokens'] / 1000) * pricing['input']
+        output_cost = (usage['completion_tokens'] / 1000) * pricing['output']
+
+        return input_cost + output_cost
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current model.
+
+        Returns:
+            Dictionary containing model information.
+        """
+        return {
+            'provider': 'anthropic',
+            'model': self.model,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+            'total_cost': self._total_cost,
+            'total_tokens': self._total_tokens,
+        }
+
+    async def stream_chat(
+        self,
+        messages: List[LLMMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        """
+        Stream a chat response from Anthropic.
+
+        Args:
+            messages: List of messages in the conversation.
+            temperature: Sampling temperature.
+            max_tokens: Maximum tokens to generate.
+            **kwargs: Additional parameters.
+
+        Yields:
+            Chunks of the response text.
+        """
+        # Validate messages
+        if not self.validate_messages(messages):
+            raise ValueError("Invalid messages format")
+
+        # Convert messages to Anthropic format
+        system_prompt, converted_messages = self._convert_messages(messages)
+
+        # Prepare parameters
+        params = {
+            'model': self.model,
+            'messages': converted_messages,
+            'temperature': temperature or self.temperature,
+            'max_tokens': max_tokens or self.max_tokens,
+        }
+
+        # Add system prompt if present
+        if system_prompt:
+            params['system'] = system_prompt
+
+        try:
+            logger.debug(f"Starting stream chat with {len(messages)} messages")
+
+            # Make streaming API call
+            async with self.client.messages.stream(**params) as stream:
+                async for text in stream.text_stream:
+                    yield text
+
+        except Exception as e:
+            logger.error(f"Anthropic streaming error: {str(e)}")
+            raise

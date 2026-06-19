@@ -1,304 +1,217 @@
 """
-Prompt templates for resource allocation.
+Resource Allocation Prompt Templates
 
-These prompts instruct the LLM to assign robot arms to tasks based on
-capabilities, availability, and optimization objectives, and to resolve
-resource conflicts when multiple tasks compete for the same arm.
+This module provides prompt templates for allocating robot arms to tasks
+in multi-arm scheduling scenarios.
 """
 
-from __future__ import annotations
 
-import json
-from typing import Any, Dict, List
+class ResourceAllocationPrompts:
+    """Prompt templates for resource allocation."""
 
+    SYSTEM_PROMPT = """You are an expert in multi-robot resource allocation and scheduling.
+Your role is to optimally assign robot arms to tasks based on their capabilities,
+current workload, and task requirements.
 
-# ---------------------------------------------------------------------------
-# Schema definitions
-# ---------------------------------------------------------------------------
+Key considerations:
+1. Match task requirements with robot arm capabilities
+2. Minimize total makespan (completion time)
+3. Balance workload across robot arms
+4. Avoid resource conflicts and collisions
+5. Respect task dependencies and priorities
 
-ALLOCATION_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "allocations": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "The task being allocated.",
-                    },
-                    "arm_id": {
-                        "type": "string",
-                        "description": "The robot arm assigned to the task.",
-                    },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "Why this arm was chosen.",
-                    },
-                    "estimated_start_time": {
-                        "type": "number",
-                        "description": "When the task can start (seconds from t=0).",
-                    },
-                    "estimated_end_time": {
-                        "type": "number",
-                        "description": "When the task is expected to finish.",
-                    },
-                },
-                "required": [
-                    "task_id",
-                    "arm_id",
-                    "reasoning",
-                    "estimated_start_time",
-                    "estimated_end_time",
-                ],
-            },
-        },
-        "unallocated_tasks": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Task IDs that could not be allocated (with reasons in notes).",
-        },
-        "makespan": {
-            "type": "number",
-            "description": "Total schedule length in seconds.",
-        },
-        "utilization": {
-            "type": "object",
-            "additionalProperties": {"type": "number"},
-            "description": "Per-arm utilization ratio (0-1).",
-        },
-        "notes": {
-            "type": "string",
-            "description": "Any observations or warnings about the allocation.",
-        },
-    },
-    "required": ["allocations", "unallocated_tasks", "makespan", "utilization"],
-}
+Output format: You must respond with valid JSON only, no additional text."""
 
-CONFLICT_RESOLVE_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "resolution": {
-            "type": "object",
-            "properties": {
-                "reassigned_tasks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "task_id": {"type": "string"},
-                            "new_arm_id": {"type": "string"},
-                            "new_start_time": {"type": "number"},
-                            "reasoning": {"type": "string"},
-                        },
-                        "required": [
-                            "task_id",
-                            "new_arm_id",
-                            "new_start_time",
-                            "reasoning",
-                        ],
-                    },
-                },
-                "deferred_tasks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "task_id": {"type": "string"},
-                            "defer_until": {"type": "number"},
-                            "reasoning": {"type": "string"},
-                        },
-                        "required": ["task_id", "defer_until", "reasoning"],
-                    },
-                },
-                "cancelled_tasks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "task_id": {"type": "string"},
-                            "reasoning": {"type": "string"},
-                        },
-                        "required": ["task_id", "reasoning"],
-                    },
-                },
-            },
-            "required": ["reassigned_tasks", "deferred_tasks", "cancelled_tasks"],
-        },
-        "new_makespan": {
-            "type": "number",
-        },
-        "notes": {
-            "type": "string",
-        },
-    },
-    "required": ["resolution", "new_makespan"],
-}
+    ALLOCATE_RESOURCES = """## Resource Allocation Request
 
+**Tasks to Allocate**:
+{tasks}
 
-# ---------------------------------------------------------------------------
-# RESOURCE_ALLOCATE_PROMPT
-# ---------------------------------------------------------------------------
+**Available Robot Arms**:
+{robot_arms}
 
+**Current State**:
+{current_state}
 
-def resource_allocate_prompt(
-    tasks: List[Dict[str, Any]],
-    robot_arms: List[Dict[str, Any]],
-    optimization_goal: str = "minimize_makespan",
-    constraints: List[str] | None = None,
-) -> str:
-    """Build the prompt that allocates robot arms to tasks.
+**Optimization Objective**: {objective}
 
-    Parameters
-    ----------
-    tasks:
-        List of task dicts with at least ``id``, ``name``,
-        ``operation_type``, ``dependencies``, ``estimated_duration``, and
-        ``required_capabilities``.
-    robot_arms:
-        List of arm dicts with at least ``id``, ``name``, and
-        ``capabilities``.
-    optimization_goal:
-        One of ``"minimize_makespan"``, ``"maximize_utilization"``, or
-        ``"balance_load"``.
-    constraints:
-        Optional list of additional constraint strings (e.g.
-        ``"arm_01 must not be used for welding"``).
+**Constraints**:
+- Each task must be assigned to exactly one robot arm
+- A robot arm can only execute one task at a time
+- Task dependencies must be respected
+- Robot arm capabilities must match task requirements
 
-    Returns
-    -------
-    str
-        A fully formatted prompt string.
-    """
-    tasks_json = json.dumps(tasks, indent=2)
-    arms_json = json.dumps(robot_arms, indent=2)
-
-    constraints_section = ""
-    if constraints:
-        bullet_list = "\n".join(f"   - {c}" for c in constraints)
-        constraints_section = f"\n\n## Additional Constraints\n{bullet_list}"
-
-    return f"""\
-You are an expert multi-robot scheduling optimizer.  Given a set of tasks \
-and available robot arms, produce an optimal allocation of arms to tasks.
-
-## Tasks
+**Required Output Format** (JSON):
 ```json
-{tasks_json}
+{{
+    "allocations": [
+        {{
+            "task_id": "task_001",
+            "arm_id": "arm_001",
+            "reason": "Explanation for this allocation",
+            "confidence": 0.95
+        }}
+    ],
+    "schedule": {{
+        "arm_001": [
+            {{"task_id": "task_001", "start_time": 0.0, "end_time": 2.5}},
+            {{"task_id": "task_003", "start_time": 2.5, "end_time": 5.0}}
+        ],
+        "arm_002": [
+            {{"task_id": "task_002", "start_time": 0.0, "end_time": 3.0}}
+        ]
+    }},
+    "estimated_makespan": 5.0,
+    "resource_utilization": {{
+        "arm_001": 0.85,
+        "arm_002": 0.72
+    }},
+    "warnings": [
+        "Any warnings or potential issues"
+    ]
+}}
 ```
 
-## Robot Arms
+Please allocate resources now."""
+
+    RESOLVE_CONFLICT = """## Conflict Resolution Request
+
+**Conflict Description**:
+{conflict}
+
+**Current Allocations**:
+{current_allocations}
+
+**Available Options**:
+{options}
+
+Please resolve this conflict while minimizing impact on overall schedule.
+
+**Required Output Format** (JSON):
 ```json
-{arms_json}
-```
+{{
+    "resolution": {{
+        "strategy": "reassign|delay|parallel|cancel",
+        "description": "Explanation of resolution"
+    }},
+    "updated_allocations": [
+        /* Same format as original allocations */
+    ],
+    "impact": {{
+        "makespan_change": 0.5,
+        "affected_tasks": ["task_001", "task_002"]
+    }}
+}}
+```"""
 
-## Optimization Goal
-{optimization_goal}
-{constraints_section}
+    OPTIMIZE_SCHEDULE = """## Schedule Optimization Request
 
-## Allocation Rules
+**Current Schedule**:
+{current_schedule}
 
-1. **Capability matching** – A robot arm can only be assigned to a task if \
-it possesses ALL of the task's ``required_capabilities``.
-2. **Dependency ordering** – If task B depends on task A, B must start \
-after A finishes (even if on the same arm).
-3. **Single-task at a time** – A robot arm can only execute one task at a \
-time.
-4. **Parallelism** – Independent tasks SHOULD be assigned to different arms \
-when possible to reduce makespan.
+**Performance Metrics**:
+{metrics}
 
-## Output Format
+**Optimization Goals**:
+{goals}
 
-Respond with a single JSON object matching this schema:
+Please suggest optimizations to improve the schedule performance.
 
+**Required Output Format** (JSON):
 ```json
-{json.dumps(ALLOCATION_SCHEMA, indent=2)}
-```
+{{
+    "optimizations": [
+        {{
+            "type": "reorder|reassign|parallelize|batch",
+            "description": "What to optimize",
+            "expected_improvement": "Expected improvement description",
+            "changes": [
+                {{
+                    "task_id": "task_001",
+                    "original": {{/* Original allocation */}},
+                    "optimized": {{/* Optimized allocation */}}
+                }}
+            ]
+        }}
+    ],
+    "estimated_improvement": {{
+        "makespan_reduction": 1.5,
+        "utilization_increase": 0.1
+    }}
+}}
+```"""
 
-Do NOT include any commentary outside the JSON object."""
+    @classmethod
+    def get_allocation_prompt(
+        cls,
+        tasks: str,
+        robot_arms: str,
+        current_state: str,
+        objective: str = "minimize_makespan"
+    ) -> str:
+        """
+        Get the resource allocation prompt.
 
+        Args:
+            tasks: JSON string of tasks to allocate.
+            robot_arms: JSON string of available robot arms.
+            current_state: JSON string of current system state.
+            objective: Optimization objective.
 
-# ---------------------------------------------------------------------------
-# CONFLICT_RESOLVE_PROMPT
-# ---------------------------------------------------------------------------
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.ALLOCATE_RESOURCES.format(
+            tasks=tasks,
+            robot_arms=robot_arms,
+            current_state=current_state,
+            objective=objective
+        )
 
+    @classmethod
+    def get_conflict_resolution_prompt(
+        cls,
+        conflict: str,
+        current_allocations: str,
+        options: str
+    ) -> str:
+        """
+        Get the conflict resolution prompt.
 
-def conflict_resolve_prompt(
-    conflicts: List[Dict[str, Any]],
-    current_allocation: List[Dict[str, Any]],
-    robot_arms: List[Dict[str, Any]],
-    tasks: List[Dict[str, Any]],
-) -> str:
-    """Build the prompt that resolves resource conflicts.
+        Args:
+            conflict: Description of the conflict.
+            current_allocations: Current resource allocations.
+            options: Available resolution options.
 
-    Parameters
-    ----------
-    conflicts:
-        List of conflict dicts, each with ``task_id``, ``conflicting_task_id``,
-        ``arm_id``, and ``conflict_type`` (e.g. ``"overlap"``,
-        ``"capability_mismatch"``).
-    current_allocation:
-        The current allocation (list of allocation dicts).
-    robot_arms:
-        List of available robot arm dicts.
-    tasks:
-        Full task list for reference.
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.RESOLVE_CONFLICT.format(
+            conflict=conflict,
+            current_allocations=current_allocations,
+            options=options
+        )
 
-    Returns
-    -------
-    str
-        A fully formatted prompt string.
-    """
-    conflicts_json = json.dumps(conflicts, indent=2)
-    allocation_json = json.dumps(current_allocation, indent=2)
-    arms_json = json.dumps(robot_arms, indent=2)
-    tasks_json = json.dumps(tasks, indent=2)
+    @classmethod
+    def get_optimization_prompt(
+        cls,
+        current_schedule: str,
+        metrics: str,
+        goals: str
+    ) -> str:
+        """
+        Get the schedule optimization prompt.
 
-    return f"""\
-You are an expert robotics scheduling conflict resolver.  The current task \
-allocation has resource conflicts that must be resolved.
+        Args:
+            current_schedule: Current schedule JSON.
+            metrics: Current performance metrics.
+            goals: Optimization goals.
 
-## Detected Conflicts
-```json
-{conflicts_json}
-```
-
-## Current Allocation
-```json
-{allocation_json}
-```
-
-## Available Robot Arms
-```json
-{arms_json}
-```
-
-## All Tasks (for reference)
-```json
-{tasks_json}
-```
-
-## Resolution Instructions
-
-For each conflict you may:
-1. **Reassign** a task to a different arm that has the required capabilities \
-and is available during the task's time window.
-2. **Defer** a task to a later time slot on the same arm.
-3. **Cancel** a task if it is infeasible given current resources (use only \
-as a last resort).
-
-Prioritise solutions that:
-- Preserve the overall schedule makespan.
-- Minimise the number of reassigned/deferred tasks.
-- Respect all dependency constraints.
-
-## Output Format
-
-Respond with a single JSON object matching this schema:
-
-```json
-{json.dumps(CONFLICT_RESOLVE_SCHEMA, indent=2)}
-```
-
-Do NOT include any commentary outside the JSON object."""
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.OPTIMIZE_SCHEDULE.format(
+            current_schedule=current_schedule,
+            metrics=metrics,
+            goals=goals
+        )

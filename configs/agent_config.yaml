@@ -3,15 +3,14 @@
 # LLM Configuration
 llm:
   # Provider: openai, anthropic, local
-  provider: "anthropic"
+  provider: "openai"
 
   # Model selection
-  model: "mimo-v2.5-pro[1m]"
+  model: "gpt-4-turbo"
 
   # API settings
-  # For Anthropic: set ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL env vars
-  # For OpenAI: set OPENAI_API_KEY env var
-  api_base: ""  # Leave empty to use provider default, or set custom endpoint
+  api_base: "https://api.openai.com/v1"
+  api_key_env: "OPENAI_API_KEY"
 
   # Generation parameters
   temperature: 0.7

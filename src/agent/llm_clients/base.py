@@ -1,307 +1,214 @@
 """
-Abstract base class and configuration for LLM clients.
+Base LLM Client Abstract Class
 
-This module defines the ``LLMClient`` ABC that all provider-specific clients
-must implement, as well as the ``LLMConfig`` dataclass used to configure them.
-Shared utilities for retry logic with exponential backoff and token counting
-are included here.
+This module defines the abstract interface for all LLM clients.
 """
 
-from __future__ import annotations
-
-import abc
-import json
-import logging
-import math
-import re
-import time
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple, Type
-
-logger = logging.getLogger(__name__)
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from enum import Enum
 
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+class MessageRole(Enum):
+    """Message role enumeration."""
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
 
 
 @dataclass
-class LLMConfig:
-    """Configuration for an LLM client instance.
+class LLMMessage:
+    """Represents a message in the conversation."""
+    role: MessageRole
+    content: str
 
-    Attributes:
-        model: Model identifier (e.g. ``"gpt-4o"``, ``"claude-sonnet-4-20250514"``).
-        temperature: Sampling temperature in [0, 2].
-        max_tokens: Maximum number of tokens to generate.
-        top_p: Nucleus sampling parameter in [0, 1].
-        api_key: API key for the provider.  If ``None`` the client will fall
-            back to the relevant environment variable.
-        api_base: Override the default API base URL.
-        timeout: Request timeout in seconds.
-        max_retries: Maximum number of retry attempts on transient failures.
-        retry_delay: Base delay (seconds) for exponential backoff.
-    """
-
-    model: str = "gpt-4o"
-    temperature: float = 0.7
-    max_tokens: int = 4096
-    top_p: float = 1.0
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    timeout: float = 60.0
-    max_retries: int = 3
-    retry_delay: float = 1.0
-
-    def __post_init__(self) -> None:
-        if self.temperature < 0 or self.temperature > 2:
-            raise ValueError(
-                f"temperature must be in [0, 2], got {self.temperature}"
-            )
-        if self.max_tokens < 1:
-            raise ValueError(
-                f"max_tokens must be >= 1, got {self.max_tokens}"
-            )
-        if self.top_p < 0 or self.top_p > 1:
-            raise ValueError(f"top_p must be in [0, 1], got {self.top_p}")
-        if self.timeout <= 0:
-            raise ValueError(f"timeout must be > 0, got {self.timeout}")
-        if self.max_retries < 0:
-            raise ValueError(
-                f"max_retries must be >= 0, got {self.max_retries}"
-            )
-        if self.retry_delay < 0:
-            raise ValueError(
-                f"retry_delay must be >= 0, got {self.retry_delay}"
-            )
+    def to_dict(self) -> Dict[str, str]:
+        """Convert to dictionary format."""
+        return {
+            "role": self.role.value,
+            "content": self.content
+        }
 
 
-# ---------------------------------------------------------------------------
-# Retry helper
-# ---------------------------------------------------------------------------
-
-
-def _retry_with_backoff(
-    fn,
-    *,
-    max_retries: int,
-    retry_delay: float,
-    retryable_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-) -> Any:
-    """Call *fn* with exponential backoff.
-
-    Parameters
-    ----------
-    fn:
-        A zero-argument callable to execute.
-    max_retries:
-        Maximum number of retries (0 means no retries).
-    retry_delay:
-        Base delay in seconds; actual delay = ``retry_delay * 2 ** attempt``.
-    retryable_exceptions:
-        Exception types that trigger a retry.  All others propagate
-        immediately.
-
-    Returns
-    -------
-    Any
-        The return value of *fn*.
-
-    Raises
-    ------
-    Exception
-        The last exception raised by *fn* if all retries are exhausted.
-    """
-    last_exc: Optional[BaseException] = None
-    for attempt in range(max_retries + 1):
-        try:
-            return fn()
-        except retryable_exceptions as exc:
-            last_exc = exc
-            if attempt == max_retries:
-                logger.error(
-                    "All %d retries exhausted. Last error: %s",
-                    max_retries,
-                    exc,
-                )
-                raise
-            delay = retry_delay * (2 ** attempt)
-            logger.warning(
-                "Attempt %d/%d failed (%s). Retrying in %.1fs ...",
-                attempt + 1,
-                max_retries + 1,
-                exc,
-                delay,
-            )
-            time.sleep(delay)
-    raise RuntimeError("Unreachable")  # pragma: no cover
-
-
-# ---------------------------------------------------------------------------
-# Token counting utility
-# ---------------------------------------------------------------------------
-
-# Average characters per token for English text.  This is a rough heuristic;
-# provider-specific clients can override ``count_tokens`` with a more accurate
-# implementation (e.g. using tiktoken).
-_AVG_CHARS_PER_TOKEN = 4.0
-
-
-def estimate_token_count(text: str) -> int:
-    """Estimate the number of tokens in *text* using a character heuristic.
-
-    This is intentionally simple; for production accuracy, use a proper
-    tokenizer such as ``tiktoken`` (OpenAI) or the Anthropic token-counting
-    API.
-    """
-    if not text:
-        return 0
-    return max(1, math.ceil(len(text) / _AVG_CHARS_PER_TOKEN))
-
-
-# ---------------------------------------------------------------------------
-# Abstract base class
-# ---------------------------------------------------------------------------
-
-
-class LLMClient(abc.ABC):
-    """Abstract base class that every LLM provider client must implement.
-
-    Subclasses must override at least:
-    * ``generate``
-    * ``generate_structured``
-    * ``get_model_name``
-
-    ``count_tokens`` has a default heuristic implementation that subclasses
-    are encouraged to replace with a provider-specific tokenizer.
-    """
-
-    def __init__(self, config: LLMConfig) -> None:
-        self._config = config
-        logger.info(
-            "LLMClient initialized with model=%s, max_retries=%d",
-            config.model,
-            config.max_retries,
-        )
-
-    # -- Public interface ---------------------------------------------------
-
-    @abc.abstractmethod
-    def generate(self, prompt: str, **kwargs: Any) -> str:
-        """Generate a free-form text completion for *prompt*.
-
-        Parameters
-        ----------
-        prompt:
-            The user prompt.
-        **kwargs:
-            Provider-specific overrides (e.g. ``temperature``).
-
-        Returns
-        -------
-        str
-            The model's response text.
-        """
-
-    @abc.abstractmethod
-    def generate_structured(
-        self, prompt: str, schema: Dict[str, Any], **kwargs: Any
-    ) -> Dict[str, Any]:
-        """Generate a structured (JSON) response that conforms to *schema*.
-
-        Parameters
-        ----------
-        prompt:
-            The user prompt (should instruct the model to return JSON).
-        schema:
-            A JSON Schema dict describing the expected output shape.
-        **kwargs:
-            Provider-specific overrides.
-
-        Returns
-        -------
-        dict
-            Parsed JSON response.
-        """
-
-    def count_tokens(self, text: str) -> int:
-        """Return the number of tokens in *text*.
-
-        The default implementation uses a simple character heuristic.
-        Subclasses should override this with a provider-specific tokenizer
-        when available.
-        """
-        return estimate_token_count(text)
-
-    @abc.abstractmethod
-    def get_model_name(self) -> str:
-        """Return the model identifier string."""
-
-    # -- Helpers ------------------------------------------------------------
+@dataclass
+class LLMResponse:
+    """Represents a response from the LLM."""
+    content: str
+    model: str
+    usage: Dict[str, int] = field(default_factory=dict)
+    finish_reason: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
-    def config(self) -> LLMConfig:
-        """Access the current configuration (read-only)."""
-        return self._config
+    def total_tokens(self) -> int:
+        """Get total tokens used."""
+        return self.usage.get('total_tokens', 0)
 
-    def _retry(
-        self,
-        fn,
-        *,
-        retryable_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-    ) -> Any:
-        """Convenience wrapper around :func:`_retry_with_backoff` using the
-        client's own retry settings."""
-        return _retry_with_backoff(
-            fn,
-            max_retries=self._config.max_retries,
-            retry_delay=self._config.retry_delay,
-            retryable_exceptions=retryable_exceptions,
-        )
+    @property
+    def prompt_tokens(self) -> int:
+        """Get prompt tokens used."""
+        return self.usage.get('prompt_tokens', 0)
 
-    @staticmethod
-    def _extract_json(text: str) -> Dict[str, Any]:
-        """Best-effort extraction of a JSON object from *text*.
+    @property
+    def completion_tokens(self) -> int:
+        """Get completion tokens used."""
+        return self.usage.get('completion_tokens', 0)
 
-        Handles cases where the model wraps the JSON in markdown fences or
-        includes leading/trailing commentary.
+
+class BaseLLMClient(ABC):
+    """
+    Abstract base class for LLM clients.
+
+    All LLM client implementations should inherit from this class
+    and implement the required methods.
+    """
+
+    def __init__(self, config: Dict[str, Any]):
         """
-        # Try direct parse first.
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
+        Initialize the LLM client.
 
-        # Try to find a JSON block in markdown fences.
-        fence_pattern = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
-        match = fence_pattern.search(text)
-        if match:
-            try:
-                return json.loads(match.group(1))
-            except json.JSONDecodeError:
-                pass
+        Args:
+            config: Configuration dictionary containing API keys,
+                   model settings, and other parameters.
+        """
+        self.config = config
+        self.model = config.get('model', 'default')
+        self.temperature = config.get('temperature', 0.7)
+        self.max_tokens = config.get('max_tokens', 4096)
+        self.top_p = config.get('top_p', 0.9)
+        self._total_cost = 0.0
+        self._total_tokens = 0
 
-        # Try to find the first { ... } or [ ... ] block.
-        for open_char, close_char in [("{", "}"), ("[", "]")]:
-            start = text.find(open_char)
-            if start == -1:
-                continue
-            depth = 0
-            for idx in range(start, len(text)):
-                if text[idx] == open_char:
-                    depth += 1
-                elif text[idx] == close_char:
-                    depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(text[start : idx + 1])
-                    except json.JSONDecodeError:
-                        break
+    @abstractmethod
+    async def chat(
+        self,
+        messages: List[LLMMessage],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a chat request to the LLM.
 
-        raise ValueError(
-            "Could not extract valid JSON from model response. "
-            f"Response text (first 500 chars): {text[:500]!r}"
-        )
+        Args:
+            messages: List of messages in the conversation.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional provider-specific parameters.
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(model={self._config.model!r})"
+        Returns:
+            LLMResponse object containing the response.
+        """
+        pass
+
+    @abstractmethod
+    async def complete(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Send a completion request to the LLM.
+
+        Args:
+            prompt: The prompt text.
+            temperature: Sampling temperature (overrides default).
+            max_tokens: Maximum tokens to generate (overrides default).
+            **kwargs: Additional provider-specific parameters.
+
+        Returns:
+            LLMResponse object containing the response.
+        """
+        pass
+
+    def create_message(self, role: MessageRole, content: str) -> LLMMessage:
+        """
+        Create a new message.
+
+        Args:
+            role: The message role (system, user, or assistant).
+            content: The message content.
+
+        Returns:
+            LLMMessage object.
+        """
+        return LLMMessage(role=role, content=content)
+
+    def create_system_message(self, content: str) -> LLMMessage:
+        """Create a system message."""
+        return self.create_message(MessageRole.SYSTEM, content)
+
+    def create_user_message(self, content: str) -> LLMMessage:
+        """Create a user message."""
+        return self.create_message(MessageRole.USER, content)
+
+    def create_assistant_message(self, content: str) -> LLMMessage:
+        """Create an assistant message."""
+        return self.create_message(MessageRole.ASSISTANT, content)
+
+    @property
+    def total_cost(self) -> float:
+        """Get total cost of API calls."""
+        return self._total_cost
+
+    @property
+    def total_tokens(self) -> int:
+        """Get total tokens used."""
+        return self._total_tokens
+
+    def _update_usage(self, response: LLMResponse):
+        """
+        Update usage statistics.
+
+        Args:
+            response: The LLM response to extract usage from.
+        """
+        self._total_tokens += response.total_tokens
+
+    @abstractmethod
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current model.
+
+        Returns:
+            Dictionary containing model information.
+        """
+        pass
+
+    def validate_messages(self, messages: List[LLMMessage]) -> bool:
+        """
+        Validate message format.
+
+        Args:
+            messages: List of messages to validate.
+
+        Returns:
+            True if messages are valid, False otherwise.
+        """
+        if not messages:
+            return False
+
+        for msg in messages:
+            if not isinstance(msg, LLMMessage):
+                return False
+            if not msg.content:
+                return False
+
+        return True
+
+    def estimate_tokens(self, text: str) -> int:
+        """
+        Estimate the number of tokens in text.
+
+        Args:
+            text: The text to estimate tokens for.
+
+        Returns:
+            Estimated number of tokens.
+        """
+        # Simple estimation: ~4 characters per token
+        # More accurate estimation would use tiktoken or similar
+        return len(text) // 4

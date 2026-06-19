@@ -155,7 +155,6 @@ data/datasets/*.zip
 data/datasets/*.tar.gz
 data/datasets/*.h5
 data/datasets/*.hdf5
-data/datasets/MRTA-Benchmark/
 
 # Model files
 *.pt

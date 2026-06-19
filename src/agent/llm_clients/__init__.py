@@ -1,20 +1,17 @@
 """
-LLM Client Layer for Multi-Arm Scheduling Agent.
+LLM Clients Module
 
-Provides abstract base classes and concrete implementations for interacting
-with various LLM providers (OpenAI, Anthropic). Includes retry logic,
-token counting, and structured output support.
+This module provides unified interfaces for various LLM providers.
 """
 
-from .base import LLMClient, LLMConfig
+from .base import BaseLLMClient, LLMResponse, LLMMessage
 from .openai_client import OpenAIClient
 from .anthropic_client import AnthropicClient
-from .factory import create_llm_client
 
 __all__ = [
-    "LLMClient",
-    "LLMConfig",
-    "OpenAIClient",
-    "AnthropicClient",
-    "create_llm_client",
+    'BaseLLMClient',
+    'LLMResponse',
+    'LLMMessage',
+    'OpenAIClient',
+    'AnthropicClient',
 ]

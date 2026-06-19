@@ -1,297 +1,288 @@
 """
-Prompt templates for executable code generation.
+Code Generation Prompt Templates
 
-These prompts instruct the LLM to generate (and refine) Python code for
-robot arm tasks using a standard set of atomic primitives.
+This module provides prompt templates for generating executable code
+for robot arm tasks in multi-arm scheduling scenarios.
 """
 
-from __future__ import annotations
 
-import json
-from typing import Any, Dict, List
+class CodeGenerationPrompts:
+    """Prompt templates for code generation."""
 
+    SYSTEM_PROMPT = """You are an expert in robotics programming and code generation.
+Your role is to generate executable Python code for robot arm tasks based on
+task specifications and available capabilities.
 
-# ---------------------------------------------------------------------------
-# Atomic primitives reference (included in prompts)
-# ---------------------------------------------------------------------------
+Key requirements:
+1. Code must be syntactically correct Python
+2. Use provided atomic skill primitives
+3. Include proper error handling
+4. Add clear comments explaining each step
+5. Follow safety guidelines
+6. Support simulation execution
 
-PRIMITIVES_REFERENCE: str = """\
-## Available Atomic Primitives
+Output format: You must respond with valid JSON containing the generated code."""
 
-The generated code must use the following primitive functions.  They are \
-imported from ``robot_primitives`` and are available in the execution \
-environment:
+    GENERATE_TASK_CODE = """## Code Generation Request
 
-| Function | Signature | Description |
-|---|---|---|
-| `move_to` | `move_to(arm_id: str, x: float, y: float, z: float, speed: float = 1.0) -> bool` | Move the arm end-effector to the given Cartesian position. Returns success. |
-| `grip` | `grip(arm_id: str, force: float = 50.0, object_id: str | None = None) -> bool` | Close the gripper with specified force (Newtons). Returns success. |
-| `release` | `release(arm_id: str, object_id: str | None = None) -> bool` | Open the gripper / release held object. Returns success. |
-| `rotate` | `rotate(arm_id: str, roll: float = 0.0, pitch: float = 0.0, yaw: float = 0.0, speed: float = 1.0) -> bool` | Rotate the end-effector by the given Euler angles (degrees). Returns success. |
-| `linear_move` | `linear_move(arm_id: str, dx: float, dy: float, dz: float, speed: float = 0.5) -> bool` | Move the end-effector by a relative linear displacement (mm). Returns success. |
-| `wait` | `wait(seconds: float) -> None` | Pause execution for the given duration. |
-| `check_sensor` | `check_sensor(arm_id: str, sensor_type: str, threshold: float | None = None) -> dict` | Read a sensor (e.g. `"force"`, `"proximity"`, `"camera"`). Returns a dict with `value` and `status`. |"""
+**Task Specification**:
+{task_spec}
 
-CODE_GENERATE_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "code": {
-            "type": "string",
-            "description": (
-                "Complete, executable Python code for the task.  Must define "
-                "a function `execute(arm_id: str) -> dict` that returns a "
-                "result dict with at least a 'success' key."
-            ),
-        },
-        "explanation": {
-            "type": "string",
-            "description": "Brief explanation of the generated code.",
-        },
-        "primitives_used": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "List of atomic primitive names used.",
-        },
-        "estimated_duration": {
-            "type": "number",
-            "description": "Estimated runtime in seconds.",
-        },
-        "error_handling": {
-            "type": "string",
-            "description": "Summary of how errors are handled.",
-        },
-    },
-    "required": [
-        "code",
-        "explanation",
-        "primitives_used",
-        "estimated_duration",
+**Robot Arm Configuration**:
+{arm_config}
+
+**Available Skill Primitives**:
+{skill_primitives}
+
+**Safety Constraints**:
+{safety_constraints}
+
+**Code Requirements**:
+1. Use only the provided skill primitives
+2. Include proper error handling and validation
+3. Add comments explaining each operation
+4. Support both simulation and real execution
+5. Respect workspace boundaries and payload limits
+
+**Required Output Format** (JSON):
+```json
+{{
+    "code": "import ...\\n\\ndef execute_task():\\n    ...",
+    "language": "python",
+    "dependencies": ["module1", "module2"],
+    "parameters": {{
+        "param1": {{"type": "float", "description": "Parameter description"}}
+    }},
+    "estimated_execution_time": 2.5,
+    "safety_checks": [
+        "Check 1 description",
+        "Check 2 description"
     ],
-}
+    "test_cases": [
+        {{
+            "name": "Test case 1",
+            "input": {{}},
+            "expected_output": {{}}
+        }}
+    ]
+}}
+```
 
-CODE_REFINE_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "refined_code": {
-            "type": "string",
-            "description": "The improved executable Python code.",
-        },
-        "changes_made": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "List of specific changes made.",
-        },
-        "explanation": {
-            "type": "string",
-            "description": "Why the changes improve the code.",
-        },
-        "primitives_used": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
-        "estimated_duration": {
-            "type": "number",
-        },
-    },
-    "required": [
-        "refined_code",
-        "changes_made",
-        "explanation",
-        "primitives_used",
-        "estimated_duration",
+Please generate the code now."""
+
+    GENERATE_SKILL_PRIMITIVE = """## Skill Primitive Generation
+
+**Skill Name**: {skill_name}
+
+**Skill Description**: {skill_description}
+
+**Input Parameters**:
+{input_parameters}
+
+**Expected Behavior**:
+{expected_behavior}
+
+**Error Conditions**:
+{error_conditions}
+
+Please generate a reusable skill primitive function.
+
+**Required Output Format** (JSON):
+```json
+{{
+    "skill_code": "def skill_name(params):\\n    ...",
+    "skill_name": "skill_name",
+    "description": "Skill description",
+    "parameters": [
+        {{
+            "name": "param1",
+            "type": "float",
+            "description": "Parameter description",
+            "required": true,
+            "default": null
+        }}
     ],
-}
+    "return_type": "dict",
+    "exceptions": [
+        {{
+            "name": "ExceptionName",
+            "description": "When this exception occurs"
+        }}
+    ],
+    "usage_example": "result = skill_name(param1=1.0)"
+}}
+```"""
 
+    OPTIMIZE_CODE = """## Code Optimization Request
 
-# ---------------------------------------------------------------------------
-# CODE_GENERATE_PROMPT
-# ---------------------------------------------------------------------------
+**Current Code**:
+{current_code}
 
+**Performance Metrics**:
+{performance_metrics}
 
-def code_generate_prompt(
-    task_name: str,
-    task_description: str,
-    operation_type: str,
-    parameters: Dict[str, Any],
-    arm_id: str,
-    arm_capabilities: List[str],
-    constraints: List[str] | None = None,
-    environment_context: str | None = None,
-) -> str:
-    """Build the prompt that generates executable Python code for a task.
+**Optimization Goals**:
+{optimization_goals}
 
-    Parameters
-    ----------
-    task_name:
-        Short name of the task.
-    task_description:
-        Detailed description of what the task should accomplish.
-    operation_type:
-        The high-level operation type (e.g. ``"pick"``, ``"place"``).
-    parameters:
-        Operation-specific parameters (target position, object id, etc.).
-    arm_id:
-        The robot arm ID that will execute this code.
-    arm_capabilities:
-        List of capabilities the assigned arm has.
-    constraints:
-        Optional list of constraints (speed limits, safety zones, etc.).
-    environment_context:
-        Optional description of the workspace / objects in the scene.
+Please optimize this code while maintaining correctness.
 
-    Returns
-    -------
-    str
-        A fully formatted prompt string.
-    """
-    params_json = json.dumps(parameters, indent=2)
-
-    constraints_section = ""
-    if constraints:
-        bullet_list = "\n".join(f"   - {c}" for c in constraints)
-        constraints_section = f"\n\n## Constraints\n{bullet_list}"
-
-    env_section = ""
-    if environment_context:
-        env_section = f"\n\n## Environment Context\n{environment_context}"
-
-    return f"""\
-You are an expert robotics code generator.  Write executable Python code \
-for a robot arm task using the available atomic primitives.
-
-{PRIMITIVES_REFERENCE}
-
-## Task Specification
-
-- **Name**: {task_name}
-- **Description**: {task_description}
-- **Operation Type**: {operation_type}
-- **Assigned Arm ID**: `{arm_id}`
-- **Arm Capabilities**: {', '.join(arm_capabilities)}
-
-## Task Parameters
+**Required Output Format** (JSON):
 ```json
-{params_json}
-```
-{constraints_section}
-{env_section}
+{{
+    "optimized_code": "optimized code here",
+    "optimizations_applied": [
+        {{
+            "type": "performance|readability|safety",
+            "description": "What was optimized",
+            "expected_improvement": "Expected improvement"
+        }}
+    ],
+    "validation_required": true,
+    "test_cases": [
+        {{
+            "name": "Test case",
+            "input": {{}},
+            "expected_output": {{}}
+        }}
+    ]
+}}
+```"""
 
-## Code Requirements
+    VALIDATE_CODE = """## Code Validation Request
 
-1. Define a function `execute(arm_id: str) -> dict` that performs the task.
-2. The return dict MUST include at least `'success': bool`.  Include \
-additional result fields as appropriate (e.g. `'object_grasped'`, \
-`'final_position'`).
-3. Use ONLY the atomic primitives listed above.  Do NOT use external \
-libraries except basic Python (`math`, `time`, `logging`).
-4. Include proper error handling: check return values of primitives and \
-handle failures gracefully.
-5. Add logging calls at key steps for traceability.
-6. Include docstrings.
-7. The code must be syntactically valid Python 3.10+.
+**Code to Validate**:
+{code}
 
-## Output Format
+**Task Specification**:
+{task_spec}
 
-Respond with a single JSON object matching this schema:
+**Validation Criteria**:
+{validation_criteria}
 
+Please validate this code against the task specification.
+
+**Required Output Format** (JSON):
 ```json
-{json.dumps(CODE_GENERATE_SCHEMA, indent=2)}
-```
+{{
+    "is_valid": true|false,
+    "issues": [
+        {{
+            "severity": "error|warning|info",
+            "line": 10,
+            "description": "Issue description",
+            "suggestion": "Suggested fix"
+        }}
+    ],
+    "corrected_code": "corrected code if needed",
+    "coverage": {{
+        "requirements_met": 8,
+        "requirements_total": 10,
+        "missing_requirements": ["requirement 1", "requirement 2"]
+    }}
+}}
+```"""
 
-Do NOT include any commentary outside the JSON object."""
+    @classmethod
+    def get_code_generation_prompt(
+        cls,
+        task_spec: str,
+        arm_config: str,
+        skill_primitives: str,
+        safety_constraints: str
+    ) -> str:
+        """
+        Get the code generation prompt.
 
+        Args:
+            task_spec: Task specification JSON.
+            arm_config: Robot arm configuration JSON.
+            skill_primitives: Available skill primitives.
+            safety_constraints: Safety constraints.
 
-# ---------------------------------------------------------------------------
-# CODE_REFINE_PROMPT
-# ---------------------------------------------------------------------------
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.GENERATE_TASK_CODE.format(
+            task_spec=task_spec,
+            arm_config=arm_config,
+            skill_primitives=skill_primitives,
+            safety_constraints=safety_constraints
+        )
 
+    @classmethod
+    def get_skill_primitive_prompt(
+        cls,
+        skill_name: str,
+        skill_description: str,
+        input_parameters: str,
+        expected_behavior: str,
+        error_conditions: str
+    ) -> str:
+        """
+        Get the skill primitive generation prompt.
 
-def code_refine_prompt(
-    original_code: str,
-    feedback: str,
-    task_name: str,
-    task_description: str,
-    operation_type: str,
-    arm_id: str,
-    error_log: str | None = None,
-    test_results: Dict[str, Any] | None = None,
-) -> str:
-    """Build the prompt that refines generated code based on feedback.
+        Args:
+            skill_name: Name of the skill.
+            skill_description: Description of the skill.
+            input_parameters: Input parameters specification.
+            expected_behavior: Expected behavior description.
+            error_conditions: Error conditions to handle.
 
-    Parameters
-    ----------
-    original_code:
-        The code that needs to be refined.
-    feedback:
-        Natural-language feedback describing what went wrong or what should
-        be improved.
-    task_name:
-        Name of the task the code implements.
-    task_description:
-        Description of the task.
-    operation_type:
-        The operation type.
-    arm_id:
-        The robot arm ID.
-    error_log:
-        Optional stack trace or error output from a failed execution.
-    test_results:
-        Optional dict of test results (e.g.
-        ``{"test_position_accuracy": {"passed": False, "actual": ..., "expected": ...}}``).
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.GENERATE_SKILL_PRIMITIVE.format(
+            skill_name=skill_name,
+            skill_description=skill_description,
+            input_parameters=input_parameters,
+            expected_behavior=expected_behavior,
+            error_conditions=error_conditions
+        )
 
-    Returns
-    -------
-    str
-        A fully formatted prompt string.
-    """
-    error_section = ""
-    if error_log:
-        error_section = f"\n\n## Error Log\n```\n{error_log}\n```"
+    @classmethod
+    def get_optimization_prompt(
+        cls,
+        current_code: str,
+        performance_metrics: str,
+        optimization_goals: str
+    ) -> str:
+        """
+        Get the code optimization prompt.
 
-    test_section = ""
-    if test_results:
-        test_json = json.dumps(test_results, indent=2)
-        test_section = f"\n\n## Test Results\n```json\n{test_json}\n```"
+        Args:
+            current_code: Current code to optimize.
+            performance_metrics: Current performance metrics.
+            optimization_goals: Optimization goals.
 
-    return f"""\
-You are an expert robotics code reviewer and fixer.  Given existing code, \
-feedback, and (optionally) error logs, produce a corrected and improved \
-version of the code.
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.OPTIMIZE_CODE.format(
+            current_code=current_code,
+            performance_metrics=performance_metrics,
+            optimization_goals=optimization_goals
+        )
 
-{PRIMITIVES_REFERENCE}
+    @classmethod
+    def get_validation_prompt(
+        cls,
+        code: str,
+        task_spec: str,
+        validation_criteria: str
+    ) -> str:
+        """
+        Get the code validation prompt.
 
-## Original Code
-```python
-{original_code}
-```
+        Args:
+            code: Code to validate.
+            task_spec: Task specification.
+            validation_criteria: Validation criteria.
 
-## Task Context
-
-- **Name**: {task_name}
-- **Description**: {task_description}
-- **Operation Type**: {operation_type}
-- **Arm ID**: `{arm_id}`
-
-## Feedback
-{feedback}
-{error_section}
-{test_section}
-
-## Refinement Instructions
-
-1. Address ALL issues mentioned in the feedback.
-2. If there are errors, fix the root cause (not just the symptom).
-3. Maintain the same function signature: `execute(arm_id: str) -> dict`.
-4. Preserve any correct logic; only change what is necessary.
-5. Improve error handling and logging if they are insufficient.
-6. Ensure the code is syntactically valid Python 3.10+.
-
-## Output Format
-
-Respond with a single JSON object matching this schema:
-
-```json
-{json.dumps(CODE_REFINE_SCHEMA, indent=2)}
-```
-
-Do NOT include any commentary outside the JSON object."""
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.VALIDATE_CODE.format(
+            code=code,
+            task_spec=task_spec,
+            validation_criteria=validation_criteria
+        )

@@ -1,294 +1,197 @@
 """
-Prompt templates for task decomposition.
+Task Decomposition Prompt Templates
 
-These prompts instruct the LLM to break down a natural-language instruction
-into structured subtasks with dependencies, required capabilities, and
-estimated durations.
+This module provides prompt templates for decomposing natural language
+instructions into structured tasks for multi-arm scheduling.
 """
 
-from __future__ import annotations
 
-import json
-from typing import Any, Dict, List
+class TaskDecompositionPrompts:
+    """Prompt templates for task decomposition."""
 
+    SYSTEM_PROMPT = """You are an expert in industrial robotics and task planning.
+Your role is to decompose natural language instructions into structured subtasks
+for a multi-arm robotic assembly system.
 
-# ---------------------------------------------------------------------------
-# Schema used by both prompts
-# ---------------------------------------------------------------------------
+Key capabilities:
+1. Understanding industrial assembly processes
+2. Identifying dependencies between operations
+3. Estimating task durations and resource requirements
+4. Recognizing constraints and safety considerations
 
-TASK_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "tasks": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": "Unique task identifier, e.g. 'task_0001'.",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Short human-readable task name.",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Detailed description of what the task does.",
-                    },
-                    "operation_type": {
-                        "type": "string",
-                        "enum": [
-                            "pick",
-                            "place",
-                            "move",
-                            "assemble",
-                            "inspect",
-                            "tighten",
-                            "weld",
-                            "paint",
-                            "wait",
-                            "check",
-                        ],
-                    },
-                    "parameters": {
-                        "type": "object",
-                        "description": (
-                            "Operation-specific parameters such as target "
-                            "position, object name, tool settings, etc."
-                        ),
-                    },
-                    "dependencies": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "IDs of tasks that must complete before this "
-                            "task can start."
-                        ),
-                    },
-                    "estimated_duration": {
-                        "type": "number",
-                        "description": "Estimated duration in seconds.",
-                    },
-                    "required_capabilities": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Robot arm capabilities needed, e.g. "
-                            "'gripper', 'vision', 'force_control'."
-                        ),
-                    },
-                },
-                "required": [
-                    "id",
-                    "name",
-                    "description",
-                    "operation_type",
-                    "parameters",
-                    "dependencies",
-                    "estimated_duration",
-                    "required_capabilities",
-                ],
-            },
-        },
-    },
-    "required": ["tasks"],
-}
+Output format: You must respond with valid JSON only, no additional text."""
 
+    DECOMPOSE_TASK = """## Task Decomposition Request
 
-# ---------------------------------------------------------------------------
-# TASK_DECOMPOSE_PROMPT
-# ---------------------------------------------------------------------------
+**Instruction**: {instruction}
 
+**Available Robot Arms**:
+{robot_arms}
 
-def task_decompose_prompt(
-    instruction: str,
-    available_capabilities: List[str] | None = None,
-    context: str | None = None,
-) -> str:
-    """Build the prompt that decomposes a natural-language instruction into
-    structured subtasks.
+**Constraints**:
+- Maximum {max_tasks} subtasks
+- Each task must have clear dependencies
+- Tasks must be executable by the available robot arms
+- Consider safety and collision avoidance
 
-    Parameters
-    ----------
-    instruction:
-        The natural-language instruction describing the overall goal.
-    available_capabilities:
-        Optional list of capability keywords that robot arms in the system
-        actually support (e.g. ``["gripper", "vision", "welding_tool"]``).
-    context:
-        Optional additional context such as environment description,
-        constraints, or previous task history.
+**Required Output Format** (JSON):
+```json
+{{
+    "objective": "Main goal of the instruction",
+    "tasks": [
+        {{
+            "id": "task_001",
+            "name": "Task Name",
+            "description": "Detailed description of what this task does",
+            "operation_type": "pick|place|move|assemble|inspect|tighten|weld|paint",
+            "parameters": {{
+                "object": "Target object",
+                "source": "Source location",
+                "destination": "Destination location",
+                "precision": "high|medium|low"
+            }},
+            "dependencies": ["task_id_1", "task_id_2"],
+            "estimated_duration": 2.5,
+            "required_capabilities": ["gripper", "positioning"],
+            "priority": 1
+        }}
+    ],
+    "constraints": [
+        "Constraint 1 description",
+        "Constraint 2 description"
+    ],
+    "estimated_total_time": 15.0
+}}
+```
 
-    Returns
-    -------
-    str
-        A fully formatted prompt string ready to pass to an LLM.
-    """
-    capabilities_section = ""
-    if available_capabilities:
-        cap_list = ", ".join(f"'{c}'" for c in available_capabilities)
-        capabilities_section = (
-            f"\n\n## Available Robot Capabilities\n"
-            f"The following capabilities are available in the system: "
-            f"{cap_list}.\n"
-            f"Only assign capabilities from this list to tasks."
+Please decompose the instruction into subtasks now."""
+
+    VALIDATE_DECOMPOSITION = """## Task Decomposition Validation
+
+**Original Instruction**: {instruction}
+
+**Decomposed Tasks**:
+{tasks}
+
+Please validate this task decomposition:
+1. Are all tasks necessary and sufficient to complete the instruction?
+2. Are the dependencies correctly specified?
+3. Are the estimated durations reasonable?
+4. Are there any missing constraints or safety considerations?
+
+**Required Output Format** (JSON):
+```json
+{{
+    "is_valid": true|false,
+    "issues": [
+        {{
+            "severity": "critical|warning|info",
+            "description": "Issue description",
+            "suggestion": "Suggested fix"
+        }}
+    ],
+    "optimized_tasks": [/* Same format as input tasks if optimization needed */]
+}}
+```"""
+
+    REFINE_TASK = """## Task Refinement Request
+
+**Original Task**:
+{task}
+
+**Context**:
+{context}
+
+**Feedback**:
+{feedback}
+
+Please refine this task based on the feedback while maintaining consistency
+with other tasks in the decomposition.
+
+**Required Output Format** (JSON):
+```json
+{{
+    "refined_task": {{
+        /* Same format as original task */
+    }},
+    "changes_made": [
+        "Description of change 1",
+        "Description of change 2"
+    ],
+    "impact_on_other_tasks": [
+        {{
+            "task_id": "affected_task_id",
+            "impact": "Description of impact"
+        }}
+    ]
+}}
+```"""
+
+    @classmethod
+    def get_decompose_prompt(
+        cls,
+        instruction: str,
+        robot_arms: str,
+        max_tasks: int = 20
+    ) -> str:
+        """
+        Get the task decomposition prompt.
+
+        Args:
+            instruction: Natural language instruction to decompose.
+            robot_arms: Description of available robot arms.
+            max_tasks: Maximum number of subtasks allowed.
+
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.DECOMPOSE_TASK.format(
+            instruction=instruction,
+            robot_arms=robot_arms,
+            max_tasks=max_tasks
         )
 
-    context_section = ""
-    if context:
-        context_section = f"\n\n## Additional Context\n{context}"
+    @classmethod
+    def get_validation_prompt(
+        cls,
+        instruction: str,
+        tasks: str
+    ) -> str:
+        """
+        Get the task validation prompt.
 
-    return f"""\
-You are an expert robotics task planner.  Your job is to decompose a high-level \
-natural-language instruction into a sequence of fine-grained subtasks that can \
-be executed by one or more robotic arms.
+        Args:
+            instruction: Original instruction.
+            tasks: JSON string of decomposed tasks.
 
-## Instruction
-{instruction}
-{capabilities_section}
-{context_section}
-
-## Requirements
-
-1. **Granularity** – Each subtask should correspond to exactly one atomic \
-robot operation (e.g. a single pick, a single move, a single inspection).
-2. **Dependencies** – Clearly specify which tasks must complete before others \
-can begin.  Tasks with no mutual dependencies can run in parallel.
-3. **Capabilities** – For every task, list the robot capabilities required \
-(e.g. gripper, vision, force_control).
-4. **Duration** – Provide a realistic duration estimate in seconds.
-5. **Parameters** – Include all operation-specific parameters (target \
-positions, object identifiers, tool settings, tolerances, etc.).
-6. **IDs** – Use sequential IDs in the format ``task_NNNN`` (e.g. \
-``task_0001``, ``task_0002``).
-
-## Output Format
-
-Respond with a single JSON object matching this schema:
-
-```json
-{json.dumps(TASK_SCHEMA, indent=2)}
-```
-
-Do NOT include any commentary outside the JSON object."""
-
-
-# ---------------------------------------------------------------------------
-# DEPENDENCY_ANALYSIS_PROMPT
-# ---------------------------------------------------------------------------
-
-
-DEPENDENCY_ANALYSIS_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "dependencies": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string"},
-                    "depends_on": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                    },
-                    "dependency_type": {
-                        "type": "string",
-                        "enum": [
-                            "temporal",
-                            "resource",
-                            "data",
-                            "causal",
-                        ],
-                    },
-                    "reason": {"type": "string"},
-                },
-                "required": [
-                    "task_id",
-                    "depends_on",
-                    "dependency_type",
-                    "reason",
-                ],
-            },
-        },
-        "parallelizable_groups": {
-            "type": "array",
-            "items": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-            "description": (
-                "Groups of task IDs that can execute simultaneously."
-            ),
-        },
-        "critical_path": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Task IDs on the critical path (longest chain).",
-        },
-    },
-    "required": ["dependencies", "parallelizable_groups", "critical_path"],
-}
-
-
-def dependency_analysis_prompt(
-    tasks: List[Dict[str, Any]],
-    environment_description: str | None = None,
-) -> str:
-    """Build the prompt that analyzes dependencies between decomposed tasks.
-
-    Parameters
-    ----------
-    tasks:
-        A list of task dictionaries (as produced by the decomposition step).
-        Each should have at least ``id``, ``name``, ``description``, and
-        ``operation_type``.
-    environment_description:
-        Optional textual description of the workspace, including object
-        positions, shared resources, and physical constraints.
-
-    Returns
-    -------
-    str
-        A fully formatted prompt string.
-    """
-    task_list_str = json.dumps(tasks, indent=2)
-
-    env_section = ""
-    if environment_description:
-        env_section = (
-            f"\n\n## Environment Description\n{environment_description}"
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.VALIDATE_DECOMPOSITION.format(
+            instruction=instruction,
+            tasks=tasks
         )
 
-    return f"""\
-You are an expert robotics scheduling analyst.  Given a list of decomposed \
-tasks, analyze all dependencies between them.
+    @classmethod
+    def get_refine_prompt(
+        cls,
+        task: str,
+        context: str,
+        feedback: str
+    ) -> str:
+        """
+        Get the task refinement prompt.
 
-## Tasks
-```json
-{task_list_str}
-```
-{env_section}
+        Args:
+            task: Original task JSON.
+            context: Context information.
+            feedback: Feedback to incorporate.
 
-## Analysis Instructions
-
-1. For each task, determine which other tasks it depends on and why.
-2. Classify each dependency as one of:
-   - **temporal** – Task B must happen after Task A (e.g. pick before place).
-   - **resource** – Tasks compete for the same robot arm or tool.
-   - **data** – Task B needs output produced by Task A.
-   - **causal** – Task B physically requires the state created by Task A.
-3. Identify groups of tasks that can run in parallel (no direct or indirect
-   dependency between them).
-4. Determine the **critical path** – the longest chain of dependent tasks
-   that bounds the minimum overall execution time.
-
-## Output Format
-
-Respond with a single JSON object matching this schema:
-
-```json
-{json.dumps(DEPENDENCY_ANALYSIS_SCHEMA, indent=2)}
-```
-
-Do NOT include any commentary outside the JSON object."""
+        Returns:
+            Formatted prompt string.
+        """
+        return cls.REFINE_TASK.format(
+            task=task,
+            context=context,
+            feedback=feedback
+        )
