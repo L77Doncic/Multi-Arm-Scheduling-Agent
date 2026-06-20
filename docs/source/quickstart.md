@@ -1,154 +1,126 @@
 # Quickstart
 
-本指南帮助你在5分钟内安装并运行多机械臂调度系统。
+本指南帮助你在 5 分钟内安装并运行多机械臂调度系统。
 
 ## 环境要求
 
-| 要求 | 说明 |
-|------|------|
-| Python | ≥ 3.10 |
-| **GPU** | **NVIDIA RTX 3070+ (8GB+ VRAM)** — Isaac Sim仿真需要 |
-| NVIDIA Driver | 535+ |
-| OS | Ubuntu 20.04/22.04 或 Windows 10/11 |
-| RAM | 32GB+ (推荐64GB) |
+| 要求 | Mock 仿真（默认） | Isaac Sim 仿真 |
+|------|:-----------------:|:--------------:|
+| Python | ≥ 3.10 | ≥ 3.10 |
+| GPU | ❌ 不需要 | ✅ NVIDIA RTX 3070+ |
+| CUDA | 不需要 | ≥ 11.7 |
+| RAM | 8GB+ | 32GB+ |
+| OS | Linux / macOS / Windows | Ubuntu 20.04/22.04 |
 
-!!! warning "GPU是必需的"
-    任务要求接入Isaac Sim进行仿真验证。Isaac Sim基于Omniverse平台，**必须使用NVIDIA RTX GPU**。
-    GTX系列、集成显卡、AMD显卡均不支持。
-
-    无GPU时可用MockSimulator进行开发调试，但无法完成物理仿真验证。
-    也可使用云端GPU实例（AWS EC2 G5、Google Cloud A2 等）。
+> [!TIP]
+> **不需要 GPU 也能完整运行系统**。默认使用 Mock 仿真器，所有功能（LLM 调度、代码生成、闭环反馈、评估）均可使用。GPU 仅在需要物理级仿真（碰撞检测、力学模拟）时必需。
 
 ## 安装
 
-### 从源码安装
-
 ```bash
+# 克隆仓库
 git clone https://github.com/L77Doncic/Multi-Arm-Scheduling-Agent.git
 cd Multi-Arm-Scheduling-Agent
 
+# 创建虚拟环境
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate   # Windows
 
+# 安装依赖
 pip install -r requirements.txt
 pip install -e .
 ```
 
-### 依赖
-
-| 包 | 用途 | 必需 |
-|----|------|------|
-| pyyaml | 配置文件解析 | ✅ |
-| numpy, scipy | 数值计算 | ✅ |
-| matplotlib | 可视化 | ✅ |
-| networkx | 依赖图 | ✅ |
-| openai | OpenAI LLM客户端 | 可选 |
-| anthropic | Anthropic LLM客户端 | 可选 |
-
-!!! tip
-    不安装 `openai` / `anthropic` 也能运行。系统会自动回退到启发式模式，所有功能可用。
-
-## 运行仿真
+## 运行第一个仿真
 
 ```bash
-# 4工位产线场景
+# 使用 Mock 仿真器（默认，无需 GPU）
 python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml
-
-# 复杂场景 + 详细日志
-python scripts/run_simulation.py --scenario data/scenarios/complex_assembly.yaml --verbose
 ```
 
-输出示例：
+<details>
+<summary>📖 预期输出</summary>
 
 ```
 ======================================================================
 SIMULATION RESULTS
 ======================================================================
-Execution ID:    5bdf620b
-Tasks:           8
-Makespan:        0.00s
+Execution ID:    c97c0ca2
+Tasks:           14
+Makespan:        23.00s
 Success Rate:    100.0%
-Resource Util:   6.7%
-Violations:      0
+Resource Util:   66.7%
+Violations:      3
 
 TASK DETAILS:
-----------------------------------------------------------------------
-  ✓ t_001  | pick_workpiece_from_feed_wp_A  | arm=arm_003 | completed
-  ✓ t_002  | assemble_components_wp_A       | arm=arm_001 | completed
-  ✓ t_003  | quality_inspection_wp_A        | arm=arm_003 | completed
-  ✓ t_004  | package_and_output_wp_A        | arm=arm_001 | completed
+  ✓ t_001  | Pick and load workpiece A    | arm=arm_001 | completed
+  ✓ t_002  | Transport workpiece A         | arm=arm_001 | completed
+  ✓ t_003  | Assemble components of A      | arm=arm_001 | completed
+  ✓ t_004  | Transport workpiece A         | arm=arm_001 | completed
+  ✓ t_005  | Inspect workpiece A           | arm=arm_003 | completed
   ...
 ```
+</details>
 
-## 下载MRTA-Benchmark数据集（可选）
+## 使用 LLM 增强（可选）
 
-评估需要真实工业数据集时，下载 APEX-MR 的 LEGO 组装任务：
+系统默认使用 ModelScope API 调用 DeepSeek-V4-Flash 模型。配置在 `configs/agent_config.yaml`：
 
-```bash
-python scripts/download_dataset.py
+```yaml
+llm:
+  provider: "openai"
+  model: "deepseek-ai/DeepSeek-V4-Flash"
+  api_base: "https://api-inference.modelscope.cn/v1"
+  api_key_env: "OPENAI_API_KEY"    # 从环境变量读取密钥
 ```
 
-这会将13个LEGO组装任务文件下载到 `data/datasets/MRTA-Benchmark/`。
-
-或手动下载：
+设置 API 密钥：
 
 ```bash
-git clone --depth 1 https://github.com/intelligent-control-lab/APEX-MR.git /tmp/APEX-MR
-mkdir -p data/datasets/MRTA-Benchmark
-cp /tmp/APEX-MR/config/lego_tasks/assembly_tasks/*.json data/datasets/MRTA-Benchmark/
+# 方式一：环境变量
+export OPENAI_API_KEY="your-api-key"
+
+# 方式二：.env 文件
+cp .env.example .env
+# 编辑 .env 填入密钥
 ```
 
-> 数据集文件不会提交到git（外部依赖，需用户自行下载）。
+> [!NOTE]
+> 无 LLM API Key 时，系统自动回退到启发式任务分解 + 模板代码生成，所有功能仍可用。
 
 ## 运行评估
 
 ```bash
-# MRTA-Benchmark全量评估（需先下载数据集）
+# 严格评估（5 次运行，配对 t 检验，NeurIPS 标准）
+python scripts/evaluate_rigorous.py \
+    --scenario data/scenarios/assembly_line_4station.yaml \
+    --runs 5
+
+# MRTA-Benchmark 数据集评估
 python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
-
-# 单场景评估（无需下载数据集）
-python scripts/evaluate.py --scenario data/scenarios/assembly_line_4station.yaml
 ```
 
-输出示例：
+<details>
+<summary>📖 评估输出示例</summary>
 
 ```
-================================================================================
-EVALUATION REPORT
-================================================================================
-Dataset: data/datasets/mrta_benchmark.json
-Scenarios: 3
+==========================================================================================
+RIGOROUS EVALUATION RESULTS (mean ± std)
+==========================================================================================
 
-Method         Makespan   Success%      Util%   Violations
---------------------------------------------------------
-Agent              0.14      100.0       54.5            1
-random            11.82       90.4       57.0            4
-greedy            11.67       95.0       93.1            0
-optimal           19.33      100.0       80.0            0
+Metric                          Agent       Greedy(LPT)            Random
+------------------------------------------------------------------------------------------
+makespan                     20.000 ± 0.000    17.000 ± 0.000    12.333 ± 1.155
+task_success_rate             1.000 ± 0.000     1.000 ± 0.000     1.000 ± 0.000
+resource_utilization          0.667 ± 0.000     0.784 ± 0.000     0.957 ± 0.096
+constraint_violations         1.000 ± 0.000     0.000 ± 0.000     0.000 ± 0.000
+
+Statistical Significance (paired t-test, α=0.05):
+  makespan          vs Greedy(LPT):  p=0.0000 ***
+  makespan          vs Random:       p=0.0003 ***
 ```
-
-## 启用LLM模式（可选）
-
-配置API密钥后，系统将使用LLM进行任务规划和代码生成：
-
-```bash
-# 方式一：环境变量
-export OPENAI_API_KEY="sk-..."
-
-# 方式二：修改配置文件
-# configs/agent_config.yaml
-# llm:
-#   provider: "openai"
-#   model: "gpt-4-turbo"
-```
-
-支持的LLM提供商：
-
-| 提供商 | 配置 `llm.provider` | 需要的环境变量 |
-|--------|-------------------|---------------|
-| OpenAI | `"openai"` | `OPENAI_API_KEY` |
-| Anthropic | `"anthropic"` | `ANTHROPIC_API_KEY` |
+</details>
 
 ## Python API 使用
 
@@ -156,54 +128,33 @@ export OPENAI_API_KEY="sk-..."
 import yaml
 from agent.core import SchedulingAgent
 
-# 加载配置
-with open("configs/agent_config.yaml") as f:
-    config = yaml.safe_load(f)
+# 1. 加载配置
+config = yaml.safe_load(open("configs/agent_config.yaml"))
 
-# 创建智能体
+# 2. 加载场景
+scene = yaml.safe_load(open("data/scenarios/assembly_line_4station.yaml"))["scenario"]
+config["robot_arms"] = scene["robot_arms"]
+
+# 3. 创建智能体
 agent = SchedulingAgent(config)
 
-# 定义场景
-scene = {
-    "stations": [
-        {"id": "s1", "operation": "pick", "capabilities_required": ["pick"],
-         "estimated_duration": 2.0, "predecessors": [], "successors": ["s2"]},
-        {"id": "s2", "operation": "assemble", "capabilities_required": ["assemble"],
-         "estimated_duration": 5.0, "predecessors": ["s1"], "successors": []},
-    ],
-    "workpieces": [
-        {"id": "wp_A", "operations_sequence": ["s1", "s2"], "priority": 1},
-    ],
-}
-
-# 执行调度
+# 4. 执行调度
 result = agent.execute_scheduling(
-    instruction="Pick workpiece A and assemble it",
+    instruction=scene["instruction"],
     scene_config=scene,
 )
 
-# 查看结果
+# 5. 查看结果
 print(f"Tasks: {len(result.tasks)}")
+print(f"Makespan: {result.makespan:.1f}s")
 print(f"Success rate: {result.task_success_rate:.0%}")
 print(f"Allocation: {result.allocation}")
-```
-
-## 运行测试
-
-```bash
-python -m pytest tests/ -v
-```
-
-```
-tests/unit/test_basic.py::TestTaskStatus::test_values PASSED
-tests/unit/test_basic.py::TestSchedulingAgent::test_execute_scheduling PASSED
-tests/unit/test_basic.py::TestCodeGenerator::test_code_is_valid_python PASSED
-...
-35 passed in 0.13s
+print(f"Feedback adjustments: {len(result.feedback_adjustments)}")
 ```
 
 ## 下一步
 
 - [Concepts](concepts.md) — 了解核心概念
 - [Task Decomposition](tasks.md) — 深入任务分解
+- [Harness Framework](harness.md) — 闭环反馈机制
 - [Configuration](configuration.md) — 完整配置说明

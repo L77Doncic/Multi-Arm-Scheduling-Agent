@@ -158,7 +158,11 @@ class MockSimulator(SimulationInterface):
             return result
 
         # Simulate failure based on probability
-        base_duration = self._durations[action_type] * self._time_scale
+        # Use task-specified duration if provided, otherwise use default
+        if "estimated_duration" in action:
+            base_duration = float(action["estimated_duration"]) * self._time_scale
+        else:
+            base_duration = self._durations[action_type] * self._time_scale
         fail_prob = self._failure_probs.get(action_type, 0.0)
         failed = self._rng.random() < fail_prob
 

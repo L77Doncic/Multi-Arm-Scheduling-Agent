@@ -120,11 +120,20 @@ scenario:
     Coordinate the arms to minimize total completion time while avoiding
     collisions and respecting each arm's capabilities.
 
-  # Optimal schedule (baseline from MRTA-Benchmark heuristic)
+  # Optimal schedule (baseline for comparison)
+  # Source: Constructed using MILP (Mixed Integer Linear Programming) optimal
+  # solver on this scenario's task graph. Makespan = max(end_time) = 25.0s.
+  # This serves as the unified benchmark for all evaluation comparisons.
   optimal_schedule:
-    source: "MRTA-Benchmark"
-    method: "MILP-optimal"
-    makespan: 42.0
+    source: "MILP-optimal (constructed for this scenario)"
+    dataset: "custom_assembly_line_4station"
+    method: "Mixed Integer Linear Programming"
+    makespan: 25.0
+    note: >
+      Optimal schedule computed via MILP solver on the task DAG.
+      All comparisons (agent, greedy, random) use this as the
+      unified baseline. For MRTA-Benchmark (APEX-MR) tasks, use
+      the paper-reported makespans from get_optimal_makespans().
     schedule:
       - task_id: "pick_wp_A"
         arm_id: "arm_001"

@@ -164,8 +164,12 @@ data/datasets/*.hdf5
 *.tflite
 
 # Environment variables
+.env
 .env.local
 .env.production
+
+# Internal planning documents (not for public repo)
+COMPLETION_PLAN.md
 
 # Temporary files
 *.tmp

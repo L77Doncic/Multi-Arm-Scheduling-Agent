@@ -183,15 +183,28 @@ graph LR
 
 ### 仿真器选择
 
-| 仿真器 | 环境要求 | 用途 |
-|--------|---------|------|
-| **MockSimulator** | CPU即可 | 开发调试、CI/CD、逻辑验证 |
-| **IsaacSimInterface** | **NVIDIA RTX GPU (8GB+)** | 最终仿真验证（任务要求） |
+系统支持 4 种仿真后端，统一接口，无缝切换：
 
-**任务要求**：系统需"接入Isaac Sim、Omniverse或Isaac Lab仿真接口完成执行验证"。
-Isaac Sim基于Omniverse平台，**必须使用NVIDIA RTX GPU**（最低RTX 3070）。
+| 仿真器 | 环境要求 | 物理引擎 | 用途 |
+|--------|---------|---------|------|
+| **MockSimulator** | CPU 即可 | 无 | 开发调试、CI/CD、逻辑验证 |
+| **IsaacSimInterface** | NVIDIA RTX GPU | PhysX 5 | 物理级仿真验证（碰撞、力学） |
+| **OmniverseInterface** | NVIDIA RTX GPU | PhysX 5 | 场景渲染 + 仿真 |
+| **IsaacLabInterface** | NVIDIA RTX GPU | PhysX 5 | RL 训练 + 批量评估 |
 
-- 开发阶段：用MockSimulator在CPU上验证调度逻辑
-- 最终验证：用Isaac Sim在GPU上进行物理仿真（碰撞检测、力学模拟）
+**任务要求**：系统需"接入 Isaac Sim、Omniverse 或 Isaac Lab 仿真接口完成执行验证"。
+三种 GPU 后端均已实现，未安装时自动回退到 MockSimulator。
 
-无GPU时可使用云端GPU实例（如AWS EC2 G5/P4d，NVIDIA A10G/A100）。
+- **开发阶段**：用 MockSimulator 在 CPU 上验证调度逻辑
+- **最终验证**：用 Isaac Sim / Omniverse / Isaac Lab 在 GPU 上进行物理仿真
+
+切换后端只需修改 `--sim` 参数：
+
+```bash
+python scripts/run_simulation.py --scenario ... --sim mock       # 默认
+python scripts/run_simulation.py --scenario ... --sim isaac      # Isaac Sim
+python scripts/run_simulation.py --scenario ... --sim omniverse  # Omniverse
+python scripts/run_simulation.py --scenario ... --sim isaac_lab  # Isaac Lab
+```
+
+无 GPU 时可使用云端 GPU 实例（如 AWS EC2 G5/P4d，NVIDIA A10G/A100）。

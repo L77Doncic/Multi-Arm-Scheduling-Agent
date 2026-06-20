@@ -6,11 +6,19 @@
 
 **开发周期**：预计8-10周
 
-**技术栈**：Python 3.10+, OpenAI/Anthropic API, Isaac Sim/Omniverse, PyTorch
+**技术栈**：Python 3.10+, DeepSeek-V4-Flash (ModelScope API), Isaac Sim/Omniverse/Isaac Lab
 
 ---
 
-## 第一阶段：基础框架搭建 (Week 1-2)
+## 完成状态总览
+
+| 阶段 | 状态 | 完成度 |
+|------|------|--------|
+| 第一阶段：基础框架搭建 | ✅ 完成 | 100% |
+| 第二阶段：Harness框架核心实现 | ✅ 完成 | 100% |
+| 第三阶段：仿真接口开发 | ✅ 完成 | 100% |
+| 第四阶段：评估系统开发 | ✅ 完成 | 100% |
+| 第五阶段：集成测试与文档 | ⚠️ 部分 | 80% |
 
 ### 1.1 LLM集成模块 ⭐ 优先级：高
 

@@ -286,3 +286,95 @@ Please validate this code against the task specification.
             task_spec=task_spec,
             validation_criteria=validation_criteria
         )
+
+
+# ------------------------------------------------------------------
+# Convenience functions (used by code_generator.py)
+# ------------------------------------------------------------------
+
+import json as _json
+
+
+def code_generate_prompt(
+    task_name: str,
+    task_description: str,
+    operation_type: str,
+    arm_id: str,
+    capabilities: list,
+    parameters: dict,
+    available_primitives: list,
+) -> str:
+    """Build a code generation prompt for a single task."""
+
+    task_spec = _json.dumps({
+        "name": task_name,
+        "description": task_description,
+        "operation_type": operation_type,
+        "parameters": parameters,
+    }, indent=2, ensure_ascii=False)
+
+    arm_config = _json.dumps({
+        "arm_id": arm_id,
+        "capabilities": capabilities,
+    }, indent=2, ensure_ascii=False)
+
+    primitives_desc = "\n".join(
+        f"  - {p}" for p in available_primitives
+    )
+
+    prompt = f"""## Code Generation Request
+
+**Task Specification**:
+{task_spec}
+
+**Robot Arm**: {arm_id}
+**Arm Capabilities**: {', '.join(capabilities)}
+
+**Available Atomic Primitives** (call via `arm_interface.<primitive>(...)`):
+{primitives_desc}
+
+**Code Requirements**:
+1. Define a function `def execute_task(arm_interface):` that returns a dict with at least `success` and `duration` keys
+2. Use only the provided atomic primitives via `arm_interface`
+3. Include comments explaining each step
+4. Add proper error handling
+
+Generate the Python code now. Respond with ONLY the Python code in a ```python block."""
+
+    return prompt
+
+
+def code_refine_prompt(
+    task_name: str,
+    original_code: str,
+    execution_result: dict,
+    error_message: str,
+    available_primitives: list,
+) -> str:
+    """Build a code refinement prompt based on execution feedback."""
+
+    primitives_desc = "\n".join(f"  - {p}" for p in available_primitives)
+
+    result_desc = _json.dumps(execution_result, indent=2, ensure_ascii=False)
+
+    prompt = f"""## Code Refinement Request
+
+**Task**: {task_name}
+
+**Original Code**:
+```python
+{original_code}
+```
+
+**Execution Result**:
+{result_desc}
+
+**Error**: {error_message or "None"}
+
+**Available Atomic Primitives**:
+{primitives_desc}
+
+The previous code failed or produced suboptimal results. Please generate a corrected
+version. Respond with ONLY the Python code in a ```python block."""
+
+    return prompt

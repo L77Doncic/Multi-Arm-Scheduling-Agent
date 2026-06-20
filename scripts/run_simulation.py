@@ -67,6 +67,24 @@ def create_simulation(sim_type: str, scene_config: dict):
         except ImportError:
             logging.warning("Isaac Sim not available, falling back to mock")
 
+    elif sim_type == "omniverse":
+        try:
+            from simulation.omniverse import OmniverseInterface
+            sim = OmniverseInterface({})
+            sim.initialize()
+            return sim
+        except ImportError:
+            logging.warning("Omniverse not available, falling back to mock")
+
+    elif sim_type == "isaac_lab":
+        try:
+            from simulation.isaac_lab import IsaacLabInterface
+            sim = IsaacLabInterface({})
+            sim.initialize()
+            return sim
+        except ImportError:
+            logging.warning("Isaac Lab not available, falling back to mock")
+
     from simulation.mock_simulator import MockSimulator
     from simulation.scene_builder import SceneBuilder
 
@@ -76,8 +94,8 @@ def create_simulation(sim_type: str, scene_config: dict):
 
     # Create mock simulator
     sim = MockSimulator(
-        failure_probabilities={'default': 0.0},
-        time_scale=100.0,
+        failure_probabilities={},  # No failures by default
+        time_scale=1.0,  # Real time scale (1.0 = normal speed)
         seed=42,
     )
     sim.initialize()
@@ -210,7 +228,7 @@ def main():
     parser.add_argument(
         "--sim",
         default="mock",
-        choices=["mock", "isaac"],
+        choices=["mock", "isaac", "omniverse", "isaac_lab"],
         help="Simulation backend (default: mock)"
     )
     parser.add_argument(

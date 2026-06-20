@@ -195,3 +195,62 @@ with other tasks in the decomposition.
             context=context,
             feedback=feedback
         )
+
+
+# ------------------------------------------------------------------
+# Convenience functions (used by planner.py)
+# ------------------------------------------------------------------
+
+def task_decompose_prompt(instruction: str, scene_config: dict) -> str:
+    """Build a task decomposition prompt from instruction and scene config."""
+    import json
+
+    arms = scene_config.get("robot_arms", [])
+    arms_desc = json.dumps(arms, indent=2, ensure_ascii=False) if arms else "No arms configured"
+
+    stations = scene_config.get("stations", [])
+    stations_desc = json.dumps(stations, indent=2, ensure_ascii=False) if stations else "No stations configured"
+
+    workpieces = scene_config.get("workpieces", [])
+    workpieces_desc = json.dumps(workpieces, indent=2, ensure_ascii=False) if workpieces else "No workpieces configured"
+
+    prompt = f"""## Task Decomposition Request
+
+**Instruction**: {instruction}
+
+**Available Stations**:
+{stations_desc}
+
+**Workpieces**:
+{workpieces_desc}
+
+**Available Robot Arms**:
+{arms_desc}
+
+**Constraints**:
+- Decompose into subtasks that can be executed by the available robot arms
+- Each task must have clear dependencies
+- Consider safety and collision avoidance
+- Respect station operation sequences for each workpiece
+
+**Required Output Format** (JSON only, no markdown):
+{{
+    "tasks": [
+        {{
+            "id": "t_001",
+            "name": "Task Name",
+            "description": "Detailed description",
+            "operation_type": "pick|place|move|assemble|inspect|tighten|weld",
+            "station_id": "station_1",
+            "workpiece_id": "wp_A",
+            "required_capabilities": ["pick", "gripper"],
+            "estimated_duration": 3.0,
+            "dependencies": [],
+            "priority": 1
+        }}
+    ]
+}}
+
+Decompose the instruction into subtasks now. Respond with JSON only."""
+
+    return prompt

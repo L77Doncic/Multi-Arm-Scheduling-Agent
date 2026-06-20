@@ -2,14 +2,14 @@
 
 # LLM Configuration
 llm:
-  # Provider: openai, anthropic, local
+  # Provider: openai, anthropic
   provider: "openai"
 
-  # Model selection
-  model: "gpt-4-turbo"
-
-  # API settings
-  api_base: "https://api.openai.com/v1"
+  # Model selection (ModelScope OpenAI-compatible API)
+  model: "deepseek-ai/DeepSeek-V4-Flash"
+  api_base: "https://api-inference.modelscope.cn/v1"
+  # API key: set via environment variable OPENAI_API_KEY
+  # or create a .env file (see .env.example)
   api_key_env: "OPENAI_API_KEY"
 
   # Generation parameters
