@@ -61,8 +61,9 @@ def create_simulation(sim_type: str, scene_config: dict):
     if sim_type == "isaac":
         try:
             from simulation.isaac_sim import IsaacSimInterface
-            sim = IsaacSimInterface({})
+            sim = IsaacSimInterface(fallback_to_mock=True)
             sim.initialize()
+            sim.load_scene(scene_config)
             return sim
         except ImportError:
             logging.warning("Isaac Sim not available, falling back to mock")
@@ -70,8 +71,9 @@ def create_simulation(sim_type: str, scene_config: dict):
     elif sim_type == "omniverse":
         try:
             from simulation.omniverse import OmniverseInterface
-            sim = OmniverseInterface({})
+            sim = OmniverseInterface(fallback_to_mock=True)
             sim.initialize()
+            sim.load_scene(scene_config)
             return sim
         except ImportError:
             logging.warning("Omniverse not available, falling back to mock")
@@ -79,18 +81,14 @@ def create_simulation(sim_type: str, scene_config: dict):
     elif sim_type == "isaac_lab":
         try:
             from simulation.isaac_lab import IsaacLabInterface
-            sim = IsaacLabInterface({})
+            sim = IsaacLabInterface(fallback_to_mock=True)
             sim.initialize()
+            sim.load_scene(scene_config)
             return sim
         except ImportError:
             logging.warning("Isaac Lab not available, falling back to mock")
 
     from simulation.mock_simulator import MockSimulator
-    from simulation.scene_builder import SceneBuilder
-
-    # Build scene
-    builder = SceneBuilder()
-    scene = builder.build_from_config(scene_config)
 
     # Create mock simulator
     sim = MockSimulator(

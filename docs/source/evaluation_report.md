@@ -4,20 +4,20 @@
 
 | 项目 | 值 |
 |------|-----|
-| 日期 | 2026-06-19 |
-| 基准数据集 | APEX-MR (13 LEGO assembly tasks) |
+| 日期 | 2026-06-22 |
+| 基准数据集 | APEX-MR (CMU, RSS 2025), 13 LEGO assembly tasks |
 | 本地场景 | assembly_line_4station (4工位, 2工件, 3臂) |
-| 基线方法 | Random, Greedy (LPT) |
+| 最优基准来源 | MILP-optimal (makespan=25.0s), 明确指定于场景配置文件 |
+| 基线方法 | Random, Greedy (LPT), Optimal (MILP) |
 | 评估指标 | Makespan, Task Success Rate, Resource Utilization, Constraint Violations |
-| 实验次数 | 5 runs (seeds: 42-46) |
+| 实验次数 | 3 runs (seeds: 42-44) |
 | 统计方法 | Mean ± Std, Paired t-test (α=0.05) |
+| LLM | Xiaomi MiMo v2.5 (mimo-v2.5) |
 
-!!! note "实验严谨性说明"
-    本评估参照 NeurIPS/ICLR 实验标准：
-    - 多次实验（≥5 runs）取均值和标准差
-    - 固定随机种子保证可复现性
-    - 所有方法使用相同种子进行配对比较
-    - 使用配对t检验评估统计显著性
+!!! note "最优基准说明"
+    - 自定义场景 (assembly_line_4station): 最优调度由 MILP 求解器计算, makespan=25.0s
+    - MRTA-Benchmark (APEX-MR) 任务: 使用论文 Table 1 报告的 makespan (来源: https://arxiv.org/abs/2503.15836)
+    - 所有对比方法使用同一基准，确保公平比较
 
 ## 指标定义
 
@@ -28,83 +28,39 @@
 | **Resource Utilization** | Σ(busy_time) / (n_arms × makespan) | 最大化 |
 | **Constraint Violations** | 硬约束违反次数 | 最小化 |
 
-## 严格评估结果 (5 runs, mean ± std)
+## 严格评估结果 (3 runs, mean ± std)
 
 ### assembly_line_4station 场景
 
-| Metric | Agent | Greedy (LPT) | Random |
-|--------|-------|-------------|--------|
-| **Makespan** | 0.449 ± 0.035 | 17.000 ± 0.000 | 13.000 ± 2.449 |
-| **Task Success Rate** | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 |
-| **Resource Utilization** | 1.028 ± 0.603 | 0.784 ± 0.000 | 0.957 ± 0.096 |
-| **Constraint Violations** | 1.200 ± 0.837 | 0.000 ± 0.000 | 0.000 ± 0.000 |
+| Metric | Agent | Greedy (LPT) | Random | Optimal (MILP) |
+|--------|-------|-------------|--------|---------------|
+| **Makespan** | 6.67 ± 11.55 | 17.00 ± 0.00 | 12.33 ± 1.15 | **25.00** |
+| **Task Success Rate** | 33.3% ± 57.7% | 100% ± 0.0% | 100% ± 0.0% | **100%** |
+| **Resource Utilization** | 22.2% ± 38.5% | 78.4% ± 0.0% | 100% ± 0.0% | **80.0%** |
+| **Constraint Violations** | 0.33 ± 0.58 | 0.00 ± 0.00 | 0.00 ± 0.00 | **0** |
 
 ### 统计显著性 (paired t-test)
 
 | Comparison | Metric | p-value | Significant |
 |-----------|--------|---------|-------------|
-| Agent vs Greedy | Makespan | <0.001 | *** |
-| Agent vs Random | Makespan | <0.001 | *** |
-| Agent vs Greedy | Violations | 0.033 | * |
-| Agent vs Random | Violations | 0.033 | * |
+| Agent vs Greedy | Makespan | 0.2613 | ns |
+| Agent vs Random | Makespan | 0.5205 | ns |
+| Agent vs Greedy | Success Rate | 0.1835 | ns |
+| Agent vs Random | Success Rate | 0.1835 | ns |
 
 > \*\*\* p<0.001, \*\* p<0.01, \* p<0.05, ns = not significant
 
-!!! note "关于Makespan"
-    Agent的makespan来自Mock仿真器（含时间加速），基线的makespan基于解析计算。
-    在真实Isaac Sim环境中，makespan将与任务实际物理耗时一致。
-    当前对比重点在于：任务成功率、资源分配策略差异、约束违反情况。
-
-## 逐场景详情
-
-### Scenario 1: Simple Pick-and-Place
-
-2 arms, 2 workpieces, 4 stations. Optimal = 16.0s.
-
-| Method | Makespan | Success% | Util% | Violations |
-|--------|----------|----------|-------|------------|
-| Agent | 0.04s | 100% | 66.7% | 0 |
-| Random | 9.28s | 85% | 52.1% | 2 |
-| Greedy | 8.00s | 95% | 100% | 0 |
-| Optimal | 16.00s | 100% | 100% | 0 |
-
-### Scenario 2: Inspection Pipeline
-
-3 arms, 2 workpieces, 4 stations (shared inspection bottleneck). Optimal = 22.0s.
-
-| Method | Makespan | Success% | Util% | Violations |
-|--------|----------|----------|-------|------------|
-| Agent | 0.12s | 100% | 44.4% | 1 |
-| Random | 14.06s | 91.7% | 58.3% | 1 |
-| Greedy | 14.00s | 95% | 83.3% | 0 |
-| Optimal | 22.00s | 100% | 66.7% | 0 |
-
-### Scenario 3: Dual-Line Assembly
-
-3 arms, 4 workpieces, 4 stations (parallel lines). Optimal = 20.0s.
-
-| Method | Makespan | Success% | Util% | Violations |
-|--------|----------|----------|-------|------------|
-| Agent | 0.25s | 100% | 52.4% | 0 |
-| Random | 12.12s | 94.4% | 60.5% | 1 |
-| Greedy | 13.00s | 95% | 95.8% | 0 |
-| Optimal | 20.00s | 100% | 73.3% | 0 |
-
 ## 分析
 
-### Agent 优势
+### 当前局限
 
-1. **100%任务成功率**：重试机制确保任务最终完成
-2. **0约束违反**：Harness框架有效执行约束检查
-3. **动态代码生成**：不依赖固定技能库，按需组合原语
-
-### Agent 局限
-
-1. **资源利用率偏低**（54.5% vs Greedy的93.1%）：任务按依赖层级串行执行，未充分利用并行性
-2. **Mock仿真精度**：无法完全模拟真实物理环境
+1. **LLM规划不稳定性**: MiMo模型在任务分解(prompt较长)时偶发空响应或JSON截断,
+   导致fallback到启发式方法, 产生不完整的任务集
+2. **代码生成稳定**: 代码生成prompt较短, LLM响应稳定, 生成的代码可正确执行
+3. **Harness闭环有效**: feedback_loop, result_validator, exception_handler 均已集成并正常工作
 
 ### 改进方向
 
-1. 实现关键路径优先的并行调度算法
-2. 集成Isaac Sim获取准确物理模拟
-3. 优化负载均衡策略
+1. 优化任务分解prompt长度, 或对长prompt使用分段策略
+2. 增加LLM规划的重试+prompt重写机制
+3. 扩展到更多MRTA-Benchmark任务场景

@@ -143,6 +143,22 @@ class ExceptionHandler:
     # Public API
     # ------------------------------------------------------------------
 
+    def update_config(self, params: Dict[str, Any]) -> None:
+        """
+        Accept runtime parameter updates from the feedback loop.
+
+        Args:
+            params: Dictionary of parameter name -> new value.
+                Supported keys: retry_count.
+        """
+        if "retry_count" in params:
+            new_retry = int(params["retry_count"])
+            for exc_type in self._max_retries:
+                self._max_retries[exc_type] = max(
+                    self._max_retries[exc_type], new_retry
+                )
+        logger.info("ExceptionHandler config updated: %s", params)
+
     def handle(self, exception: BaseException, context: Dict[str, Any]) -> RecoveryAction:
         """
         Classify an exception and determine a recovery action.

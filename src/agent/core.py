@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from harness.exception_handler import RecoveryActionType
+
 logger = logging.getLogger(__name__)
 
 
@@ -199,6 +201,13 @@ class SchedulingAgent:
         generator.  Falls back to heuristic mode if LLM is unavailable.
         """
         import os
+
+        # Load .env file if present
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
 
         llm_config = self.config.get("llm", {})
         if not llm_config:
@@ -390,6 +399,34 @@ class SchedulingAgent:
             tasks, allocation, simulation, plan, generated_codes
         )
 
+        # --- Step 4b: Result validation ---
+        logger.info("[Step 4b] Result validation")
+        validation_result = self.result_validator.validate({
+            "tasks": [
+                {
+                    "id": t.id,
+                    "status": t.status.value,
+                    "duration": (t.end_time or 0) - (t.start_time or 0),
+                }
+                for t in tasks
+            ],
+            "total_duration": sim_total_time,
+            "resource_usage": {
+                arm_id: sum(
+                    (e["end_time"] - e["start_time"])
+                    for e in execution_log
+                    if e["arm_id"] == arm_id
+                )
+                for arm_id in set(e["arm_id"] for e in execution_log)
+            }
+            if execution_log
+            else {},
+        })
+        if not validation_result.is_valid:
+            logger.warning("Validation failed: %s", validation_result.summary)
+        else:
+            logger.info("Validation passed: %s", validation_result.summary)
+
         # --- Step 5: Feedback collection & analysis ---
         logger.info("[Step 5] Feedback analysis")
         analysis = self.feedback_loop.analyze_feedback()
@@ -407,6 +444,18 @@ class SchedulingAgent:
             }
             for adj in adjustments
         ]
+
+        # Apply feedback adjustments to target modules (close the loop)
+        for adj in adjustments:
+            if adj.target_module == "resource_allocator":
+                self.resource_allocator.update_config(
+                    {adj.parameter: adj.new_value}
+                )
+            elif adj.target_module == "exception_handler":
+                self.exception_handler.update_config(
+                    {adj.parameter: adj.new_value}
+                )
+
         logger.info(
             "Feedback: score=%.2f, %d adjustments, bottlenecks=%s",
             analysis.performance_score,
@@ -422,6 +471,11 @@ class SchedulingAgent:
             execution_log, len(self.robot_arms), makespan
         )
         constraint_violations = self._count_violations(execution_log)
+        # Add violations detected by the result validator
+        if not validation_result.is_valid:
+            constraint_violations += int(
+                validation_result.metrics.get("critical_violations", 0)
+            )
 
         # --- Build result ---
         result = ExecutionResult(
@@ -619,8 +673,11 @@ class SchedulingAgent:
 
                 # --- Execute the generated code in simulation ---
                 attempt = 1
-                max_attempts = 3
+                strategy = self.feedback_loop.get_current_strategy()
+                max_attempts = int(strategy.get("retry_count", 3))
                 exec_result = None
+                recovery = None
+                last_exception = None
 
                 while attempt <= max_attempts:
                     code = (generated_codes or {}).get(task_id)
@@ -650,13 +707,41 @@ class SchedulingAgent:
                             }
 
                     if exec_result.get("success", False):
+                        if recovery and last_exception:
+                            self.exception_handler.record_exception(
+                                last_exception, recovery, "success"
+                            )
                         break
 
-                    # Handle failure
+                    # Classify and handle the failure via exception_handler
                     error_msg = exec_result.get("error", "Unknown error")
+                    last_exception = RuntimeError(error_msg)
+                    recovery = self.exception_handler.handle(
+                        last_exception,
+                        {
+                            "task_id": task_id,
+                            "arm_id": arm_id,
+                            "attempt": attempt,
+                            "module_name": "execution",
+                        },
+                    )
+
+                    if recovery.action_type == RecoveryActionType.SKIP:
+                        logger.warning(
+                            "Exception handler SKIP for task %s after %d attempts",
+                            task_id, attempt,
+                        )
+                        break
+                    elif recovery.action_type == RecoveryActionType.REPLAN:
+                        logger.warning(
+                            "Exception handler REPLAN suggested for task %s",
+                            task_id,
+                        )
+
                     logger.warning(
-                        "Task %s attempt %d failed: %s",
+                        "Task %s attempt %d failed: %s (recovery=%s)",
                         task_id, attempt, error_msg,
+                        recovery.action_type.value,
                     )
                     attempt += 1
 

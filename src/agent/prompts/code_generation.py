@@ -322,6 +322,22 @@ def code_generate_prompt(
         f"  - {p}" for p in available_primitives
     )
 
+    # Provide exact API signatures so the LLM generates correct calls
+    api_signatures = """
+**Primitive API Signatures** (MUST follow exactly):
+  arm_interface.move_to(x: float, y: float, z: float, speed: float = 1.0) -> bool
+  arm_interface.linear_move(dx: float, dy: float, dz: float, speed: float = 1.0) -> bool
+  arm_interface.grip(force: float = 50.0) -> bool
+  arm_interface.release() -> bool
+  arm_interface.rotate(roll: float = 0, pitch: float = 0, yaw: float = 0, speed: float = 1.0) -> bool
+  arm_interface.wait(duration: float = 1.0) -> bool
+  arm_interface.check_sensor(sensor_type: str) -> dict
+  arm_interface.set_payload(mass: float = 0.0) -> bool
+  arm_interface.set_compliance(stiffness_x: float = 200, stiffness_y: float = 200, stiffness_z: float = 200) -> bool
+
+**IMPORTANT**: move_to() takes 3 separate floats (x, y, z), NOT a tuple or dict. Example: `arm_interface.move_to(1.0, 0.5, 0.3)`
+"""
+
     prompt = f"""## Code Generation Request
 
 **Task Specification**:
@@ -332,7 +348,7 @@ def code_generate_prompt(
 
 **Available Atomic Primitives** (call via `arm_interface.<primitive>(...)`):
 {primitives_desc}
-
+{api_signatures}
 **Code Requirements**:
 1. Define a function `def execute_task(arm_interface):` that returns a dict with at least `success` and `duration` keys
 2. Use only the provided atomic primitives via `arm_interface`
@@ -373,6 +389,17 @@ def code_refine_prompt(
 
 **Available Atomic Primitives**:
 {primitives_desc}
+
+**Primitive API Signatures** (MUST follow exactly):
+  arm_interface.move_to(x: float, y: float, z: float, speed: float = 1.0) -> bool
+  arm_interface.linear_move(dx: float, dy: float, dz: float, speed: float = 1.0) -> bool
+  arm_interface.grip(force: float = 50.0) -> bool
+  arm_interface.release() -> bool
+  arm_interface.rotate(roll: float = 0, pitch: float = 0, yaw: float = 0, speed: float = 1.0) -> bool
+  arm_interface.wait(duration: float = 1.0) -> bool
+  arm_interface.check_sensor(sensor_type: str) -> dict
+  arm_interface.set_payload(mass: float = 0.0) -> bool
+  arm_interface.set_compliance(stiffness_x: float = 200, stiffness_y: float = 200, stiffness_z: float = 200) -> bool
 
 The previous code failed or produced suboptimal results. Please generate a corrected
 version. Respond with ONLY the Python code in a ```python block."""

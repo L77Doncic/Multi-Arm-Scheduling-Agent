@@ -4,10 +4,11 @@
 
 | 项目 | 值 |
 |------|-----|
-| 日期 | 2026-06-19 |
+| 日期 | 2026-06-22 |
 | OS | Linux 6.8.0-87-generic |
 | Python | 3.12.3 |
-| 仿真后端 | MockSimulator (time_scale=100x, seed=42) |
+| LLM | Xiaomi MiMo v2.5 (mimo-v2.5) |
+| 仿真后端 | MockSimulator (time_scale=1.0x, seed=42) |
 
 ## 场景：4-Station Assembly Line
 

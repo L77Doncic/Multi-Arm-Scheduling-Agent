@@ -94,6 +94,20 @@ class ResourceAllocator:
     # Public API
     # ------------------------------------------------------------------
 
+    def update_config(self, params: Dict[str, Any]) -> None:
+        """
+        Accept runtime parameter updates from the feedback loop.
+
+        Args:
+            params: Dictionary of parameter name -> new value.
+                Supported keys: resource_weight, priority_boost.
+        """
+        if "resource_weight" in params:
+            self.workload_weight = float(params["resource_weight"])
+        if "priority_boost" in params:
+            self.priority_weight = float(params["priority_boost"])
+        logger.info("ResourceAllocator config updated: %s", params)
+
     def allocate(
         self,
         tasks: List[Any],
