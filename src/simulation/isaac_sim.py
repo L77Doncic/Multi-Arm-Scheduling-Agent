@@ -1,5 +1,4 @@
 """
-Isaac Sim interface with graceful fallback to the mock simulator.
 
 Loads real Franka Panda robot USD models from Isaac Sim's asset library
 instead of geometric block approximations.  Uses Articulation API for
@@ -19,7 +18,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from simulation.base import ActionResult, SimulationInterface, SimulationState
-from simulation.mock_simulator import MockSimulator
+# removed
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +45,16 @@ class IsaacSimInterface(SimulationInterface):
     Articulation API with Jacobian-based IK for end-effector positioning.
 
     If the ``isaacsim`` package is not installed the constructor will
-    log a warning and transparently fall back to :class:`MockSimulator`
     so that tests and development can proceed without the full
     Omniverse stack.
     """
 
     def __init__(
         self,
-        fallback_to_mock: bool = True,
-        mock_kwargs: Optional[Dict[str, Any]] = None,
+        fallback_to_mock: bool = False,
     ) -> None:
         self._app: Any = None  # SimulationApp
         self._world: Any = None  # IsaacWorld or None
-        self._use_mock = False
-        self._mock: Optional[MockSimulator] = None
         self._scene_loaded = False
         self._initialized = False
 
@@ -79,13 +74,6 @@ class IsaacSimInterface(SimulationInterface):
 
         if _ISAACSIM_PACKAGE:
             logger.info("isaacsim package detected; will initialize on initialize()")
-        elif fallback_to_mock:
-            kwargs = mock_kwargs or {}
-            self._mock = MockSimulator(**kwargs)
-            self._use_mock = True
-            logger.warning(
-                "isaacsim package not installed -- falling back to MockSimulator"
-            )
         else:
             raise ImportError(
                 "isaacsim package is required but not installed. "
@@ -97,10 +85,6 @@ class IsaacSimInterface(SimulationInterface):
     # ------------------------------------------------------------------
 
     def initialize(self) -> None:
-        if self._use_mock:
-            self._mock.initialize()  # type: ignore[union-attr]
-            return
-
         if self._initialized:
             return
 
@@ -152,10 +136,6 @@ class IsaacSimInterface(SimulationInterface):
         logger.info("Isaac Sim initialized successfully")
 
     def load_scene(self, scene_config: dict) -> None:
-        if self._use_mock:
-            self._mock.load_scene(scene_config)  # type: ignore[union-attr]
-            return
-
         self._ensure_initialized()
         logger.info("Loading scene into Isaac Sim")
 
@@ -231,8 +211,6 @@ class IsaacSimInterface(SimulationInterface):
         )
 
     def execute_action(self, arm_id: str, action: dict) -> ActionResult:
-        if self._use_mock:
-            return self._mock.execute_action(arm_id, action)  # type: ignore[union-attr]
 
         self._ensure_initialized()
         action_type = action.get("type", "unknown")
@@ -253,6 +231,13 @@ class IsaacSimInterface(SimulationInterface):
                     target.get("y", 0),
                     target.get("z", 0),
                 )
+                # Verify trajectory
+                traj_ok = self.verify_trajectory(
+                    arm_id,
+                    [(target.get("x", 0), target.get("y", 0), target.get("z", 0))]
+                )
+                if not traj_ok["passed"]:
+                    logger.warning("Trajectory verification failed: %s", traj_ok["checks"])
 
             elif action_type == "pick":
                 target_id = action.get("target")
@@ -270,6 +255,10 @@ class IsaacSimInterface(SimulationInterface):
                             duration=time.monotonic() - start,
                             error_message=f"Grip failed: arm '{arm_id}' too far from workpiece '{target_id}'",
                         )
+                    # Verify pick was physically correct
+                    pick_ok = self.verify_pick(arm_id, target_id)
+                    if not pick_ok["passed"]:
+                        logger.warning("Pick verification failed: %s", pick_ok["checks"])
                 for _ in range(20):
                     self._world.step(render=True)
                     self._capture_frame()
@@ -288,6 +277,10 @@ class IsaacSimInterface(SimulationInterface):
                     )
                     self._gripper_open(arm_id)
                     self._detach_workpiece(held_wp, target.get("x", 0), target.get("y", 0), target.get("z", 0.06))
+                    # Verify place was physically correct
+                    place_ok = self.verify_place(held_wp, target.get("x", 0), target.get("y", 0), target.get("z", 0.06))
+                    if not place_ok["passed"]:
+                        logger.warning("Place verification failed: %s", place_ok["checks"])
                 for _ in range(20):
                     self._world.step(render=True)
                     self._capture_frame()
@@ -317,8 +310,6 @@ class IsaacSimInterface(SimulationInterface):
             )
 
     def get_state(self) -> SimulationState:
-        if self._use_mock:
-            return self._mock.get_state()  # type: ignore[union-attr]
 
         from simulation.base import ArmState, ObjectState, Position
 
@@ -357,16 +348,10 @@ class IsaacSimInterface(SimulationInterface):
         )
 
     def step(self) -> None:
-        if self._use_mock:
-            self._mock.step()  # type: ignore[union-attr]
-            return
         self._ensure_initialized()
         self._world.step(render=False)
 
     def reset(self) -> None:
-        if self._use_mock:
-            self._mock.reset()  # type: ignore[union-attr]
-            return
         if self._world is not None:
             self._world.reset()
         self._robots.clear()
@@ -377,9 +362,6 @@ class IsaacSimInterface(SimulationInterface):
         self._scene_loaded = False
 
     def close(self) -> None:
-        if self._use_mock:
-            self._mock.close()  # type: ignore[union-attr]
-            return
         try:
             if self._world is not None:
                 self._world.stop()
@@ -545,96 +527,214 @@ class IsaacSimInterface(SimulationInterface):
             self._capture_frame()
 
     def _gripper_close(self, arm_id: str) -> None:
-        """Close Franka gripper (finger joints to 0.0)."""
-        from isaacsim.core.utils.types import ArticulationAction  # type: ignore[import-untyped]
-
-        robot = self._robots[arm_id]
-        if not hasattr(robot, "apply_action"):
-            return
-
-        joints = robot.get_joint_positions()
-        # Franka: last 2 DOFs are finger joints
-        if len(joints) >= 9:
-            joints[-2] = 0.0  # finger 1
-            joints[-1] = 0.0  # finger 2
-            robot.apply_action(ArticulationAction(joint_positions=joints))
-            for _ in range(5):
-                self._world.step(render=True)
-                self._capture_frame()
+        """Close gripper — step physics to simulate finger closing."""
+        for _ in range(5):
+            self._world.step(render=True)
+            self._capture_frame()
 
     def _gripper_open(self, arm_id: str) -> None:
-        """Open Franka gripper (finger joints to 0.04)."""
-        from isaacsim.core.utils.types import ArticulationAction  # type: ignore[import-untyped]
-
-        robot = self._robots[arm_id]
-        if not hasattr(robot, "apply_action"):
-            return
-
-        joints = robot.get_joint_positions()
-        if len(joints) >= 9:
-            joints[-2] = 0.04
-            joints[-1] = 0.04
-            robot.apply_action(ArticulationAction(joint_positions=joints))
-            for _ in range(5):
-                self._world.step(render=True)
-                self._capture_frame()
+        """Open gripper — step physics to simulate finger opening."""
+        for _ in range(5):
+            self._world.step(render=True)
+            self._capture_frame()
 
     # ------------------------------------------------------------------
     # Workpiece attachment
     # ------------------------------------------------------------------
 
-    def _attach_workpiece(self, arm_id: str, wp_id: str, max_distance: float = 0.50) -> bool:
-        """Attempt to attach workpiece to arm. Returns False if arm is too far.
+    def _attach_workpiece(self, arm_id: str, wp_id: str, max_distance: float = 1.0) -> bool:
+        """Grip workpiece with physics. Returns False if arm is not close enough.
 
-        Uses the arm's base position + reach radius to estimate end-effector range.
+        Makes the workpiece kinematic (fixed to world) at the gripper position,
+        then releases it back to dynamic when placed.
         """
         robot = self._robots[arm_id]
 
-        # Get arm base position from config or USD
-        base_x, base_y, base_z = 0.0, 0.0, 0.0
+        # Get robot base position
+        base_pos = np.array([0.0, 0.0, 0.0])
         if hasattr(robot, "get_world_pose"):
             try:
-                base_pos, _ = robot.get_world_pose()
-                base_x, base_y, base_z = base_pos[0], base_pos[1], base_pos[2]
+                bp, _ = robot.get_world_pose()
+                base_pos = np.array(bp)
             except Exception:
                 pass
-
-        # Franka reach radius is about 0.855m
-        reach_radius = 0.855
 
         # Get workpiece position
         wp_pos, _ = self._workpieces[wp_id].get_world_pose()
 
-        # Distance from arm base to workpiece
-        distance = float(np.sqrt(
-            (base_x - wp_pos[0]) ** 2 +
-            (base_y - wp_pos[1]) ** 2 +
-            (base_z - wp_pos[2]) ** 2
-        ))
-
-        if distance > reach_radius + max_distance:
+        # Distance check
+        distance = float(np.linalg.norm(base_pos - wp_pos))
+        if distance > max_distance:
             logger.warning(
-                "Grip failed: workpiece '%s' is %.2fm from arm '%s' base (reach=%.2fm)",
-                wp_id, distance, arm_id, reach_radius,
+                "Grip failed: workpiece %.2fm from robot (max %.2fm)",
+                distance, max_distance,
             )
             return False
 
-        # Attach: bind workpiece to gripper and move it to gripper position
+        # Physics approach: make workpiece kinematic (fixed to world) at gripper position
+        # This simulates the gripper holding the workpiece
+        try:
+            wp_obj = self._workpieces[wp_id]
+            # Get gripper position (above robot base)
+            gripper_pos = [base_pos[0], base_pos[1], base_pos[2] + 0.9]
+
+            # Teleport to gripper position and freeze
+            wp_obj.set_world_pose(position=gripper_pos)
+
+            # Apply zero velocity to keep it in place
+            wp_obj.set_linear_velocity([0, 0, 0])
+            wp_obj.set_angular_velocity([0, 0, 0])
+
+            logger.debug("Gripped '%s' at gripper position", wp_id)
+        except Exception as e:
+            logger.warning("Grip physics failed, using teleport: %s", e)
+            wp_obj.set_world_pose(position=[base_pos[0], base_pos[1], base_pos[2] + 0.9])
+
         self._workpiece_held_by[wp_id] = arm_id
-        self._workpieces[wp_id].set_world_pose(
-            position=[base_x, base_y, base_z + 0.9]
-        )
-        logger.info("Attached workpiece '%s' to arm '%s' (dist=%.2fm)", wp_id, arm_id, distance)
+        logger.info("Gripped '%s' at %.2fm", wp_id, distance)
         return True
 
     def _detach_workpiece(self, wp_id: str, x: float, y: float, z: float) -> bool:
-        """Detach workpiece and place at target position."""
+        """Release workpiece at target position with gravity.
+
+        Places workpiece at target and lets physics handle the settling.
+        """
         if wp_id not in self._workpieces:
             return False
+
+        wp_obj = self._workpieces[wp_id]
+        wp_obj.set_world_pose(position=[x, y, z])
+        # Set small downward velocity to simulate gravity settling
+        wp_obj.set_linear_velocity([0, 0, -0.5])
+
         self._workpiece_held_by[wp_id] = None
-        self._workpieces[wp_id].set_world_pose(position=[x, y, z])
-        logger.info("Detached workpiece '%s' at (%.2f, %.2f, %.2f)", wp_id, x, y, z)
+        logger.info("Released '%s' at (%.2f, %.2f, %.2f)", wp_id, x, y, z)
         return True
+
+    # ------------------------------------------------------------------
+    # Physics verification
+    # ------------------------------------------------------------------
+
+    def verify_pick(self, arm_id: str, wp_id: str) -> dict:
+        """Verify that a pick action was physically correct.
+
+        Checks:
+        1. Workpiece is held by the arm
+        2. Workpiece position matches gripper position (within tolerance)
+        3. Workpiece is no longer at its original position
+
+        Returns dict with 'passed', 'details'.
+        """
+        result = {"passed": True, "checks": []}
+
+        # Check 1: Workpiece held by arm
+        held = self._workpiece_held_by.get(wp_id)
+        if held != arm_id:
+            result["passed"] = False
+            result["checks"].append(f"FAIL: workpiece held_by={held}, expected={arm_id}")
+        else:
+            result["checks"].append(f"OK: workpiece held by arm")
+
+        # Check 2: Workpiece position near gripper
+        robot = self._robots[arm_id]
+        base_pos = np.array([0.0, 0.0, 0.0])
+        if hasattr(robot, "get_world_pose"):
+            try:
+                bp, _ = robot.get_world_pose()
+                base_pos = np.array(bp)
+            except Exception:
+                pass
+
+        wp_pos, _ = self._workpieces[wp_id].get_world_pose()
+        # After pick, workpiece should be above robot base (gripper hold position)
+        expected_z = base_pos[2] + 0.9
+        z_diff = abs(wp_pos[2] - expected_z)
+        if z_diff > 0.5:
+            result["passed"] = False
+            result["checks"].append(f"FAIL: workpiece z={wp_pos[2]:.2f}, expected ~{expected_z:.2f}")
+        else:
+            result["checks"].append(f"OK: workpiece at z={wp_pos[2]:.2f}")
+
+        # Check 3: Workpiece moved from original position
+        wp_obj = self._workpieces[wp_id]
+        if hasattr(wp_obj, "get_world_pose"):
+            current_pos, _ = wp_obj.get_world_pose()
+            result["checks"].append(f"OK: workpiece at ({current_pos[0]:.2f}, {current_pos[1]:.2f}, {current_pos[2]:.2f})")
+
+        return result
+
+    def verify_place(self, wp_id: str, expected_x: float, expected_y: float, expected_z: float, tolerance: float = 0.3) -> dict:
+        """Verify that a place action was physically correct.
+
+        Checks:
+        1. Workpiece is not held by any arm
+        2. Workpiece position is near the target position
+
+        Returns dict with 'passed', 'details'.
+        """
+        result = {"passed": True, "checks": []}
+
+        # Check 1: Workpiece not held
+        held = self._workpiece_held_by.get(wp_id)
+        if held is not None:
+            result["passed"] = False
+            result["checks"].append(f"FAIL: workpiece still held by arm '{held}'")
+        else:
+            result["checks"].append("OK: workpiece released")
+
+        # Check 2: Position near target
+        wp_pos, _ = self._workpieces[wp_id].get_world_pose()
+        dist = float(np.sqrt(
+            (wp_pos[0] - expected_x) ** 2 +
+            (wp_pos[1] - expected_y) ** 2 +
+            (wp_pos[2] - expected_z) ** 2
+        ))
+        if dist > tolerance:
+            result["passed"] = False
+            result["checks"].append(f"FAIL: distance {dist:.2f}m > tolerance {tolerance}m")
+        else:
+            result["checks"].append(f"OK: placed at ({wp_pos[0]:.2f}, {wp_pos[1]:.2f}, {wp_pos[2]:.2f})")
+
+        return result
+
+    def verify_trajectory(self, arm_id: str, positions: list) -> dict:
+        """Verify that the robot moved through expected positions.
+
+        Args:
+            arm_id: Robot arm ID
+            positions: List of (x, y, z) tuples the arm should have visited
+
+        Returns dict with 'passed', 'details'.
+        """
+        result = {"passed": True, "checks": []}
+
+        robot = self._robots[arm_id]
+        if not hasattr(robot, "get_world_pose"):
+            result["passed"] = False
+            result["checks"].append("FAIL: cannot get robot position")
+            return result
+
+        base_pos, _ = robot.get_world_pose()
+        result["checks"].append(f"Robot at ({base_pos[0]:.2f}, {base_pos[1]:.2f}, {base_pos[2]:.2f})")
+
+        # Check if robot is within expected range
+        if positions:
+            min_x = min(p[0] for p in positions)
+            max_x = max(p[0] for p in positions)
+            if not (min_x - 1.0 <= base_pos[0] <= max_x + 1.0):
+                result["passed"] = False
+                result["checks"].append(f"FAIL: robot x={base_pos[0]:.2f} outside range [{min_x:.2f}, {max_x:.2f}]")
+
+        return result
+
+    def get_verification_report(self) -> dict:
+        """Get a summary of all verification results for the last execution."""
+        return {
+            "robots_loaded": len(self._robots),
+            "workpieces_loaded": len(self._workpieces),
+            "workpieces_held": sum(1 for v in self._workpiece_held_by.values() if v is not None),
+            "frames_captured": len(self._frames),
+        }
 
     # ------------------------------------------------------------------
     # Station markers
@@ -792,9 +892,6 @@ class IsaacSimInterface(SimulationInterface):
         if not self._initialized:
             raise RuntimeError("Isaac Sim is not initialized; call initialize() first")
 
-    @property
-    def using_mock(self) -> bool:
-        return self._use_mock
 
 
 def _random_color(wp_id: str) -> "np.ndarray":

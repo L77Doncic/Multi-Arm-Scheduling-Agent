@@ -131,12 +131,14 @@ composite_score = capability_weight × cap_score
 
 **可调策略参数**:
 
-| 参数 | 范围 | 默认值 | 调整触发条件 |
-|------|------|:------:|-------------|
-| `timeout_adjustment` | [0.5, 5.0] | 1.0 | 性能评分 < 0.8 |
-| `retry_count` | [1, 10] | 3 | 机械臂成功率低 |
-| `resource_weight` | [0.0, 1.0] | 0.5 | 机械臂过载 |
-| `priority_boost` | [0.0, 2.0] | 0.0 | 任务频繁失败 |
+| 参数 | 范围 | 默认值 | 调整触发条件 | 应用模块 |
+|------|------|:------:|-------------|----------|
+| `timeout_adjustment` | [0.5, 5.0] | 1.0 | 性能评分 < 0.8 | ResourceAllocator |
+| `retry_count` | [1, 10] | 3 | 机械臂成功率低 | ExceptionHandler |
+| `resource_weight` | [0.0, 1.0] | 0.5 | 机械臂过载 | ResourceAllocator |
+| `priority_boost` | [0.0, 2.0] | 0.0 | 任务频繁失败 | ResourceAllocator |
+| `speed_factor` | [0.1, 3.0] | 1.0 | 失败率 > 20% | CodeGenerator |
+| `force_factor` | [0.5, 3.0] | 1.0 | 失败率 > 20% | CodeGenerator |
 
 **性能评分**:
 
@@ -208,21 +210,27 @@ harness:
 
 ## 6. 示例：闭环反馈生效场景
 
-当模拟器设置高失败率时，反馈循环自动触发策略调整：
+当仿真中任务失败率较高时，反馈循环自动触发策略调整：
 
 ```
-输入: assemble 失败率 = 60%
-结果: 8 任务中 2 个失败
-性能评分: 0.66 (< 0.8 阈值)
+输入: 失败率 > 20%
+结果: 多个任务执行失败
 
 自动调整:
-  1. timeout_adjustment: 1.0 → 1.2
-     原因: "Low performance score (0.66); increasing timeout factor"
+  1. speed_factor: 1.0 → 0.8
+     原因: "High failure rate; slowing generated code movements"
   
-  2. retry_count: 3 → 4
+  2. force_factor: 1.0 → 1.15
+     原因: "High failure rate; increasing grip force in generated code"
+
+  3. timeout_adjustment: 1.0 → 1.2
+     原因: "Low performance score; increasing timeout factor"
+
+  4. retry_count: 3 → 4
      原因: "Low arm success rate detected; increasing retries"
 
-瓶颈识别:
-  - Arm arm_001 has low success rate (67%)
-  - Arm arm_002 has low success rate (67%)
+应用到模块:
+  → ResourceAllocator: 更均衡地分配任务
+  → CodeGenerator: 生成更慢更稳的代码，抓取力更大
+  → ExceptionHandler: 允许更多重试次数
 ```

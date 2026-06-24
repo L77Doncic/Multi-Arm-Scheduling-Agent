@@ -594,53 +594,13 @@ class SchedulingAgent:
     # ------------------------------------------------------------------
 
     def _create_default_simulation(self, scene_config: Dict[str, Any]):
-        """Create simulation backend. Isaac Sim by default; mock only if explicitly requested."""
-        sim_config = self.config.get("simulation", {})
-        backend = sim_config.get("backend", "isaac")
+        """Create Isaac Sim simulation backend."""
+        from simulation.isaac_sim import IsaacSimInterface
 
-        if backend == "mock":
-            logger.info("Mock backend explicitly requested via config")
-            return self._create_mock_simulation(scene_config, sim_config)
-
-        # Default: try Isaac Sim
-        try:
-            from simulation.isaac_sim import IsaacSimInterface
-
-            sim = IsaacSimInterface(fallback_to_mock=False)
-            sim.initialize()
-            sim.load_scene(scene_config)
-            logger.info("Created Isaac Sim simulation (real physics)")
-            return sim
-        except ImportError:
-            if backend == "isaac":
-                # Isaac Sim explicitly requested but not available
-                raise RuntimeError(
-                    "Isaac Sim requested but not installed. "
-                    "Install with: pip install isaacsim --extra-index-url https://pypi.nvidia.com"
-                )
-            # Auto mode: fall back to mock with warning
-            logger.warning("Isaac Sim not available, falling back to mock simulator")
-            return self._create_mock_simulation(scene_config, sim_config)
-
-    def _create_mock_simulation(self, scene_config: Dict[str, Any], sim_config: Dict[str, Any]):
-        """Create a mock simulator (only when explicitly requested or as fallback)."""
-        from simulation.mock_simulator import MockSimulator
-
-        mock_config = sim_config.get("mock", {})
-
-        sim = MockSimulator(
-            failure_probabilities={
-                "default": mock_config.get("failure_probability", 0.0)
-            },
-            time_scale=1.0,
-            seed=42,
-        )
+        sim = IsaacSimInterface(fallback_to_mock=False)
         sim.initialize()
-
-        mock_scene = self._build_mock_scene(scene_config)
-        sim.load_scene(mock_scene)
-
-        logger.info("Created mock simulator")
+        sim.load_scene(scene_config)
+        logger.info("Created Isaac Sim simulation (real physics)")
         return sim
 
     def _build_mock_scene(self, scene_config: Dict[str, Any]) -> dict:

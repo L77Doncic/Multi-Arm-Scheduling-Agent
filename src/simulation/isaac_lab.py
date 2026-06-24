@@ -4,14 +4,13 @@ Isaac Lab interface with graceful fallback to the mock simulator.
 Wraps the NVIDIA Isaac Lab API (the successor framework built on top
 of Isaac Sim / Omniverse, providing a Python-first workflow for
 robot learning and evaluation).  When Isaac Lab is not installed
-the class silently delegates every call to :class:`MockSimulator`.
 """
 
 import logging
 from typing import Any, Dict, Optional
 
 from simulation.base import ActionResult, SimulationInterface, SimulationState
-from simulation.mock_simulator import MockSimulator
+# mock removed
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,6 @@ class IsaacLabInterface(SimulationInterface):
 
     If the ``isaacsim`` or ``omni.isaac.lab`` package is not installed
     the constructor will log a warning and transparently fall back to
-    :class:`MockSimulator`.
 
     Isaac Lab is the recommended backend for reinforcement learning
     and evaluation workflows.  It provides a cleaner Python API than
@@ -56,14 +54,12 @@ class IsaacLabInterface(SimulationInterface):
         """
         Args:
             fallback_to_mock: If True and Isaac Lab is unavailable,
-                silently delegate to MockSimulator.
             mock_kwargs: Extra keyword arguments forwarded to the
-                MockSimulator constructor when falling back.
             headless: Run without GUI (for server deployments).
             device: GPU device for physics simulation.
         """
         self._use_mock = False
-        self._mock: Optional[MockSimulator] = None
+        self._mock = None
         self._world: Any = None
         self._scene_loaded = False
         self._headless = headless
@@ -73,9 +69,8 @@ class IsaacLabInterface(SimulationInterface):
             logger.info("Isaac Lab detected; using real runtime")
         elif fallback_to_mock:
             kwargs = mock_kwargs or {}
-            self._mock = MockSimulator(**kwargs)
+            raise ImportError("Isaac Lab not installed")
             self._use_mock = True
-            logger.warning("Isaac Lab not installed -- falling back to MockSimulator")
         else:
             raise ImportError(
                 "isaacsim (Isaac Lab) is required but not installed. "

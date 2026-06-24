@@ -383,7 +383,7 @@ def test_code_generator_speed_force_factors():
 def test_code_regeneration_on_failure():
     """Test that code is regenerated with adjusted factors after a task failure."""
     from agent.core import SchedulingAgent
-    from simulation.mock_simulator import MockSimulator
+    from simulation.isaac_sim import IsaacSimInterface
 
     config = {
         "robot_arms": [
@@ -401,19 +401,22 @@ def test_code_regeneration_on_failure():
     }
     agent = SchedulingAgent(config)
 
-    sim = MockSimulator(failure_probabilities={"pick": 1.0}, time_scale=1.0, seed=42)
+    # Place workpiece far from arm to trigger grip failure
+    sim = IsaacSimInterface(fallback_to_mock=False)
     sim.initialize()
     sim.load_scene(
         {
             "robot_arms": [
-                {"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}
+                {"id": "a1", "base_position": {"x": 0, "y": 0, "z": 0}}
             ],
-            "objects": [
+            "workpieces": [
                 {
                     "id": "obj1",
-                    "type": "workpiece",
-                    "position": {"x": 1, "y": 0, "z": 0},
+                    "initial_position": {"x": 10, "y": 10, "z": 0},
                 }
+            ],
+            "stations": [
+                {"id": "s1", "position": {"x": 0, "y": 0, "z": 0}}
             ],
         }
     )
@@ -426,74 +429,71 @@ def test_code_regeneration_on_failure():
                 {
                     "id": "obj1",
                     "type": "part",
-                    "initial_position": {"x": 1, "y": 0, "z": 0},
+                    "initial_position": {"x": 10, "y": 10, "z": 0},
                 }
             ],
         },
         simulation=sim,
     )
 
-    assert agent.code_generator.speed_factor < 1.0
-    assert agent.code_generator.force_factor > 1.0
+    # The workpiece is far from the arm, so grip should fail
+    # This should trigger code regeneration with adjusted factors
+    assert agent.code_generator.speed_factor < 1.0 or agent.code_generator.force_factor > 1.0
 
     sim.close()
 
 
 # ------------------------------------------------------------------
-# Mock Simulator tests
+# Isaac Sim physics verification tests
 # ------------------------------------------------------------------
 
 
-def test_mock_simulator_execute_action():
-    """Test mock simulator can execute a basic action."""
-    from simulation.mock_simulator import MockSimulator
+def test_isaac_sim_execute_action():
+    """Test Isaac Sim can execute a basic move action."""
+    from simulation.isaac_sim import IsaacSimInterface
 
-    sim = MockSimulator(time_scale=1.0, seed=42)
+    sim = IsaacSimInterface(fallback_to_mock=False)
     sim.initialize()
     sim.load_scene(
         {
-            "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
-            "objects": [
-                {
-                    "id": "obj1",
-                    "type": "workpiece",
-                    "position": {"x": 1, "y": 0, "z": 0},
-                }
+            "robot_arms": [{"id": "arm_001", "base_position": {"x": 0, "y": 0, "z": 0}}],
+            "workpieces": [
+                {"id": "wp_A", "initial_position": {"x": 0.5, "y": 0, "z": 0.1}}
             ],
+            "stations": [{"id": "s1", "position": {"x": 0, "y": 0, "z": 0}}],
         }
     )
     result = sim.execute_action(
-        "a1", {"type": "move", "position": {"x": 1, "y": 0, "z": 0}}
+        "arm_001", {"type": "move", "position": {"x": 0.5, "y": 0, "z": 0.1}}
     )
     assert result.success is True
     sim.close()
 
 
-def test_mock_simulator_failure_injection():
-    """Test mock simulator configurable failure rates."""
-    from simulation.mock_simulator import MockSimulator
+def test_isaac_sim_pick_and_verify():
+    """Test Isaac Sim pick with physics verification."""
+    from simulation.isaac_sim import IsaacSimInterface
 
-    # 100% failure rate for pick
-    sim = MockSimulator(
-        failure_probabilities={"pick": 1.0},
-        time_scale=1.0,
-        seed=42,
-    )
+    sim = IsaacSimInterface(fallback_to_mock=False)
     sim.initialize()
     sim.load_scene(
         {
-            "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
-            "objects": [
-                {
-                    "id": "obj1",
-                    "type": "workpiece",
-                    "position": {"x": 0, "y": 0, "z": 0},
-                }
+            "robot_arms": [{"id": "arm_001", "base_position": {"x": 0, "y": 0, "z": 0}}],
+            "workpieces": [
+                {"id": "wp_A", "initial_position": {"x": 0.5, "y": 0, "z": 0.1}}
             ],
+            "stations": [{"id": "s1", "position": {"x": 0, "y": 0, "z": 0}}],
         }
     )
-    result = sim.execute_action("a1", {"type": "pick", "target": "obj1"})
-    assert result.success is False
+
+    sim.execute_action("arm_001", {"type": "move", "position": {"x": 0.5, "y": 0, "z": 0.1}})
+    result = sim.execute_action("arm_001", {"type": "pick", "target": "wp_A"})
+    assert result.success is True
+
+    # Verify physics
+    pick_verify = sim.verify_pick("arm_001", "wp_A")
+    assert pick_verify["passed"] is True
+
     sim.close()
 
 

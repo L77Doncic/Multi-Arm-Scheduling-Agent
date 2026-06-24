@@ -135,37 +135,41 @@ from harness.feedback_loop import FeedbackLoop
 loop = FeedbackLoop(config={})
 
 # 1. 采集反馈
-feedback = loop.collect_feedback({
+loop.collect_feedback({
     "task_id": "t_001",
     "arm_id": "arm_001",
-    "status": "failed",
+    "status": "failure",
     "duration": 5.2,
-    "result": {"error": "Timeout"},
+    "resource_usage": {"arm_001": 5.2},
+    "errors": ["Timeout"],
 })
 
 # 2. 分析
-analysis = loop.analyze_feedback(feedback)
+analysis = loop.analyze_feedback()
 print(analysis.performance_score)   # 0.6
-print(analysis.bottlenecks)         # ["t_001"]
-print(analysis.recommendations)     # ["Increase timeout for pick operations"]
+print(analysis.bottlenecks)         # ["Arm arm_001 has low success rate (67%)"]
+print(analysis.recommendations)     # ["Consider increasing retry_count"]
 
 # 3. 调整策略
-adjustment = loop.adjust_strategy(analysis)
-print(adjustment.target_module)     # "task"
-print(adjustment.parameter)         # "default_timeout"
-print(adjustment.old_value)         # 30.0
-print(adjustment.new_value)         # 45.0
-print(adjustment.reason)            # "Repeated timeouts on pick operations"
+adjustments = loop.adjust_strategy(analysis)
+for adj in adjustments:
+    print(adj.target_module)    # "resource_allocator" / "code_generator"
+    print(adj.parameter)        # "speed_factor" / "force_factor"
+    print(adj.old_value)        # 1.0
+    print(adj.new_value)        # 0.8
+    print(adj.reason)           # "High failure rate; slowing movements"
 ```
 
-#### 可调参数
+#### 可调参数（6个）
 
-| 参数 | 目标模块 | 说明 |
-|------|---------|------|
-| `default_timeout` | task | 任务默认超时 |
-| `max_retries` | harness | 最大重试次数 |
-| `resource_weight` | allocator | 能力匹配权重 |
-| `priority_boost` | planner | 优先级提升系数 |
+| 参数 | 目标模块 | 范围 | 默认值 | 触发条件 |
+|------|---------|------|:------:|----------|
+| `timeout_adjustment` | ResourceAllocator | [0.5, 5.0] | 1.0 | 性能评分 < 0.8 |
+| `retry_count` | ExceptionHandler | [1, 10] | 3 | 成功率低 |
+| `resource_weight` | ResourceAllocator | [0.0, 1.0] | 0.5 | 机械臂过载 |
+| `priority_boost` | ResourceAllocator | [0.0, 2.0] | 0.0 | 频繁失败 |
+| `speed_factor` | CodeGenerator | [0.1, 3.0] | 1.0 | 失败率 > 20% |
+| `force_factor` | CodeGenerator | [0.5, 3.0] | 1.0 | 失败率 > 20% |
 
 ## 闭环数据流
 

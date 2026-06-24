@@ -2,7 +2,6 @@
 Omniverse interface with graceful fallback to the mock simulator.
 
 Wraps the NVIDIA Omniverse Kit API.  When Omniverse is not installed
-the class silently delegates every call to :class:`MockSimulator`,
 matching the pattern used by :class:`IsaacSimInterface`.
 """
 
@@ -10,7 +9,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from simulation.base import ActionResult, SimulationInterface, SimulationState
-from simulation.mock_simulator import MockSimulator
+# mock removed
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,6 @@ class OmniverseInterface(SimulationInterface):
     SimulationInterface backed by NVIDIA Omniverse Kit.
 
     If the ``omni.kit`` package is not installed the constructor will
-    log a warning and transparently fall back to :class:`MockSimulator`.
 
     Omniverse differs from Isaac Sim in that it provides a general-purpose
     USD-based scene authoring and rendering framework, while Isaac Sim
@@ -43,7 +41,7 @@ class OmniverseInterface(SimulationInterface):
         mock_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         self._use_mock = False
-        self._mock: Optional[MockSimulator] = None
+        self._mock = None
         self._stage: Any = None
         self._scene_loaded = False
 
@@ -51,9 +49,8 @@ class OmniverseInterface(SimulationInterface):
             logger.info("Omniverse detected; using real runtime")
         elif fallback_to_mock:
             kwargs = mock_kwargs or {}
-            self._mock = MockSimulator(**kwargs)
+            raise ImportError("Omniverse not installed")
             self._use_mock = True
-            logger.warning("Omniverse not installed -- falling back to MockSimulator")
         else:
             raise ImportError(
                 "omni.kit is required but not installed. "

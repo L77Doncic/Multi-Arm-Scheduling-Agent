@@ -73,10 +73,5 @@ if frames:
     except Exception:
         pass
 
-# Try to close gracefully
-try:
-    sim.close()
-except Exception:
-    pass
-
-print(json.dumps(exp_result))
+# Force exit — Isaac Sim destructor crashes the process
+os._exit(0)
