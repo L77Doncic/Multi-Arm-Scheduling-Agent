@@ -25,12 +25,12 @@
 
 | 场景文件 | 说明 | 任务数 | 最优Makespan |
 |----------|------|:------:|:------------:|
-| `1p_production_line.json` | 1工件，4工位，3机械臂 | 8 | 584.9s |
-| `2p_production_line.json` | 2工件，4工位，3机械臂 | 8 | 931.0s |
-| `3p_production_line.json` | 3工件，4工位，3机械臂 | 8 | 642.8s |
-| `4p_production_line.json` | 4工件，4工位，3机械臂 | 8 | 465.0s |
-| `5p_production_line.json` | 5工件，4工位，3机械臂 | 8 | 490.9s |
-| `6p_production_line.json` | 6工件，4工位，3机械臂 | 8 | 489.8s |
+| `1p_production_line.json` | MRTA实例1p，2工件，4工位，3机械臂 | 8 | 584.9s |
+| `2p_production_line.json` | MRTA实例2p，2工件，4工位，3机械臂 | 8 | 931.0s |
+| `3p_production_line.json` | MRTA实例3p，2工件，4工位，3机械臂 | 8 | 642.8s |
+| `4p_production_line.json` | MRTA实例4p，2工件，4工位，3机械臂 | 8 | 465.0s |
+| `5p_production_line.json` | MRTA实例5p，2工件，4工位，3机械臂 | 8 | 490.9s |
+| `6p_production_line.json` | MRTA实例6p，2工件，4工位，3机械臂 | 8 | 489.8s |
 
 ### 1.3 最新实验结果（seed=42，MRTA旅行时间 + 真实LLM）
 

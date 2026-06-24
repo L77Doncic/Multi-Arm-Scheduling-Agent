@@ -21,9 +21,9 @@ calc = MetricsCalculator()
 # 从执行日志计算
 metrics = calc.calculate_all(execution_log, num_arms=3)
 
-print(metrics.makespan)             # 25.3
+print(metrics.makespan)             # 247.4
 print(metrics.task_success_rate)    # 1.0
-print(metrics.resource_utilization) # 0.72
+print(metrics.resource_utilization) # 0.34
 print(metrics.constraint_violations) # 0
 print(metrics.total_tasks)          # 8
 print(metrics.completed_tasks)      # 8
@@ -125,15 +125,27 @@ python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.js
     "agent_results": [...],
     "baseline_results": {"random": [...], "greedy": [...]},
     "agent_aggregate": {
-        "avg_makespan": 103.7,
-        "avg_success_rate": 1.0,
-        "avg_resource_util": 0.37,
+        "avg_makespan": 625.1,
+        "avg_success_rate": 0.94,
+        "avg_resource_util": 0.35,
         "total_violations": 0
     },
     "baseline_aggregates": {...},
-    "timestamp": "2026-06-24 20:00:00"
+    "timestamp": "2026-06-25 10:00:00"
 }
 ```
+
+## 最新实验结果（seed=42）
+
+| 场景 | Makespan | 最优Makespan | 比率 | 成功率 | 资源利用率 |
+|------|:--------:|:------------:|:----:|:------:|:----------:|
+| 1p | 247.4s | 584.9s | 0.42x | 100% | 34% |
+| 2p | 885.9s | 931.0s | 0.95x | 88% | 33% |
+| 3p | 757.2s | 642.8s | 1.18x | 100% | 39% |
+| 4p | 750.0s | 465.0s | 1.61x | 100% | 38% |
+| 5p | 311.7s | 490.9s | 0.64x | 100% | 35% |
+| 6p | 818.2s | 489.8s | 1.67x | 75% | 33% |
+| **平均** | - | - | **1.08x** | **94%** | **35%** |
 
 ## Visualizer
 

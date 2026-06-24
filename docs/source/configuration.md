@@ -181,12 +181,12 @@ simulation:
 
 | 场景文件 | 说明 | 最优Makespan |
 |----------|------|:------------:|
-| 1p_production_line.json | 1工件，4工位，3机械臂 | 584.9s |
-| 2p_production_line.json | 2工件，4工位，3机械臂 | 931.0s |
-| 3p_production_line.json | 3工件，4工位，3机械臂 | 642.8s |
-| 4p_production_line.json | 4工件，4工位，3机械臂 | 465.0s |
-| 5p_production_line.json | 5工件，4工位，3机械臂 | 490.9s |
-| 6p_production_line.json | 6工件，4工位，3机械臂 | 489.8s |
+| 1p_production_line.json | MRTA实例1p，2工件，4工位，3机械臂 | 584.9s |
+| 2p_production_line.json | MRTA实例2p，2工件，4工位，3机械臂 | 931.0s |
+| 3p_production_line.json | MRTA实例3p，2工件，4工位，3机械臂 | 642.8s |
+| 4p_production_line.json | MRTA实例4p，2工件，4工位，3机械臂 | 465.0s |
+| 5p_production_line.json | MRTA实例5p，2工件，4工位，3机械臂 | 490.9s |
+| 6p_production_line.json | MRTA实例6p，2工件，4工位，3机械臂 | 489.8s |
 
 ## 环境变量
 

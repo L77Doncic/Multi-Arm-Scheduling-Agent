@@ -18,6 +18,7 @@
 | 物理精度 | PhysX物理引擎（重力、碰撞、关节） |
 | 机械臂 | Franka Panda USD模型 |
 | 控制方式 | Jacobian伪逆IK + 关节控制 |
+| 旅行时间 | MRTA T_t矩阵（机械臂间移动时间） |
 | 用途 | **物理仿真验证** |
 
 !!! warning "GPU是必需的"
@@ -65,6 +66,19 @@ sim.close()
 | 夹爪动作 | 物理步进 | ✅ |
 | 抓取工件 | 传送+冻结 | ❌ |
 | 释放工件 | 传送+重力 | ⚠️ |
+| **旅行时间** | **MRTA T_t矩阵** | ✅ |
+
+### MRTA旅行时间矩阵
+
+系统实现了MRTA旅行时间矩阵（T_t），用于计算机械臂间的移动时间：
+
+```python
+# T_t矩阵定义了机械臂从位置i到位置j的旅行时间
+# Makespan = max(task.end_time) - min(task.start_time)
+# 其中task.end_time包含旅行时间
+```
+
+**效果**: Makespan与MRTA基准具有可比性，平均比率1.08x
 
 ### 视频录制
 

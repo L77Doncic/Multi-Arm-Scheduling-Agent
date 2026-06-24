@@ -313,12 +313,12 @@ history.append(exception, recovery, outcome)</div>
 
   <table>
     <tr><th>场景</th><th>任务数</th><th>平均Makespan</th><th>最优Makespan</th><th>比率</th><th>资源利用率</th></tr>
-    <tr><td>1p (1工件)</td><td>8</td><td>68.0s</td><td>584.9s</td><td>0.12x</td><td>54%</td></tr>
-    <tr><td>2p (2工件)</td><td>8</td><td>67.6s</td><td>931.0s</td><td>0.07x</td><td>33%</td></tr>
-    <tr><td>3p (3工件)</td><td>8</td><td>84.7s</td><td>642.8s</td><td>0.13x</td><td>35%</td></tr>
-    <tr><td>4p (4工件)</td><td>8</td><td>128.0s</td><td>465.0s</td><td>0.28x</td><td>34%</td></tr>
-    <tr><td>5p (5工件)</td><td>8</td><td>145.5s</td><td>490.9s</td><td>0.30x</td><td>33%</td></tr>
-    <tr><td>6p (6工件)</td><td>8</td><td>128.2s</td><td>489.8s</td><td>0.26x</td><td>33%</td></tr>
+    <tr><td>1p (MRTA实例)</td><td>8</td><td>247.4s</td><td>584.9s</td><td>0.42x</td><td>34%</td></tr>
+    <tr><td>2p (MRTA实例)</td><td>8</td><td>885.9s</td><td>931.0s</td><td>0.95x</td><td>33%</td></tr>
+    <tr><td>3p (MRTA实例)</td><td>8</td><td>757.2s</td><td>642.8s</td><td>1.18x</td><td>39%</td></tr>
+    <tr><td>4p (MRTA实例)</td><td>8</td><td>750.0s</td><td>465.0s</td><td>1.61x</td><td>38%</td></tr>
+    <tr><td>5p (MRTA实例)</td><td>8</td><td>311.7s</td><td>490.9s</td><td>0.64x</td><td>35%</td></tr>
+    <tr><td>6p (MRTA实例)</td><td>8</td><td>818.2s</td><td>489.8s</td><td>1.67x</td><td>33%</td></tr>
   </table>
   <p class="dim" style="font-size: 14px;">注：MILP最优基准考虑完整工件流转约束，当前启发式调度更激进，因此Makespan更短。</p>
 </div>
