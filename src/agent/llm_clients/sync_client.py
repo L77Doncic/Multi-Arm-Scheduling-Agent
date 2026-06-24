@@ -127,7 +127,8 @@ class SyncLLMClient:
         full_prompt += "\n\nRespond with ONLY valid JSON, no markdown formatting."
 
         temperature = kwargs.get("temperature", min(self.temperature, 0.3))
-        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        # Reasoning models need much more tokens - they use tokens for thinking
+        max_tokens = kwargs.get("max_tokens", 16384)
 
         messages = [
             {
@@ -156,17 +157,40 @@ class SyncLLMClient:
     ) -> str:
         """Call the LLM API with retry logic."""
         import time as _time
+        import json as _json
 
         last_error = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                response = self._client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+                # Ensure messages are JSON serializable
+                try:
+                    _json.dumps(messages)
+                except TypeError as e:
+                    logger.error("Messages not JSON serializable: %s", e)
+                    # Convert any non-serializable objects to strings
+                    messages = self._make_serializable(messages)
+
+                # Use HTTP API directly to avoid SDK serialization issues
+                import requests
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                }
+                resp = requests.post(
+                    f"{self.api_base}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120
                 )
-                content = response.choices[0].message.content
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
                 if not content:
                     raise ValueError("Empty response from LLM")
                 logger.debug(
@@ -189,6 +213,18 @@ class SyncLLMClient:
         raise RuntimeError(
             f"LLM call failed after {self.max_retries} attempts: {last_error}"
         )
+
+    @staticmethod
+    def _make_serializable(obj):
+        """Make an object JSON serializable."""
+        if isinstance(obj, dict):
+            return {k: SyncLLMClient._make_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [SyncLLMClient._make_serializable(item) for item in obj]
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        else:
+            return str(obj)
 
     @staticmethod
     def _extract_json(text: str) -> Dict[str, Any]:

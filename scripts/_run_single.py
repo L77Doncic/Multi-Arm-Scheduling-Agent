@@ -19,6 +19,10 @@ with open(scenario_path) as f:
     raw = json.load(f)
 scenario = raw.get("scenario", raw)
 
+# Merge mrta_travel_times into scenario if it exists at top level
+if "mrta_travel_times" in raw and "mrta_travel_times" not in scenario:
+    scenario["mrta_travel_times"] = raw["mrta_travel_times"]
+
 config = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "agent_config.yaml")))
 config["robot_arms"] = scenario["robot_arms"]
 

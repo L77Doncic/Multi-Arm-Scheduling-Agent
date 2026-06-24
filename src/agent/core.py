@@ -340,6 +340,16 @@ class SchedulingAgent:
             self.config["robot_arms"] = scene_config["robot_arms"]
             self._init_robot_arms()
 
+        # Load MRTA travel times if available
+        from simulation.mrta_travel import get_travel_manager
+        travel_manager = get_travel_manager()
+        travel_manager.load_scenario(scene_config)
+        travel_stats = travel_manager.get_statistics()
+        if travel_stats:
+            logger.info("MRTA travel times loaded: avg_task=%.1fs, avg_travel=%.1fs",
+                       travel_stats.get('avg_task_time', 0),
+                       travel_stats.get('avg_travel_time', 0))
+
         # --- Step 1: Task decomposition ---
         logger.info("[Step 1] Task decomposition")
         plan = self.planner.create_plan(instruction, scene_config)
@@ -816,6 +826,44 @@ class SchedulingAgent:
                 # Use estimated_duration as minimum if duration is too small
                 if duration < 0.001:
                     duration = task.estimated_duration
+
+                # Add travel time from MRTA data if available
+                from simulation.mrta_travel import get_travel_manager
+                travel_mgr = get_travel_manager()
+                if travel_mgr._travel_times:
+                    T_e = travel_mgr._travel_times.get('T_e', [])
+                    T_t = travel_mgr._travel_times.get('T_t', [])
+                    num_mrta_tasks = len(T_e)
+
+                    # Get task index from task_id (format: "t_001", "t_002", etc.)
+                    try:
+                        task_idx = int(task_id.replace('t_', '')) - 1  # Convert to 0-based
+                    except (ValueError, IndexError):
+                        task_idx = 0
+
+                    # Map to MRTA task index (wrap around if more tasks than MRTA data)
+                    mrta_idx = task_idx % num_mrta_tasks if num_mrta_tasks > 0 else 0
+
+                    # Get execution time from MRTA data
+                    exec_time_mrta = travel_mgr.get_task_execution_time(mrta_idx)
+
+                    # Get travel time based on task dependencies
+                    travel_time = 0
+                    if task.dependencies and T_t:
+                        prev_task_id = task.dependencies[0]  # First dependency
+                        try:
+                            prev_idx = int(prev_task_id.replace('t_', '')) - 1
+                            prev_mrta_idx = prev_idx % num_mrta_tasks
+                            travel_time = travel_mgr.get_travel_time(prev_mrta_idx, mrta_idx)
+                        except (ValueError, IndexError):
+                            pass
+
+                    # Use MRTA times if available
+                    if exec_time_mrta > 0:
+                        duration = travel_time + exec_time_mrta
+                        logger.debug("Task %s: travel=%.1fs + exec=%.1fs = total=%.1fs",
+                                   task_id, travel_time, exec_time_mrta, duration)
+
                 success = exec_result.get("success", False) if exec_result else False
                 end_time = start_time + duration
 

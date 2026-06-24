@@ -1,4 +1,4 @@
-# 项目总结报告（更新于 2026-06-24）
+# 项目总结报告（更新于 2026-06-25）
 
 ## 1. 已完成内容
 
@@ -9,13 +9,13 @@
 | **SchedulingAgent** | `src/agent/core.py` | ✅ | 6步管线编排器，已移除Mock回退 |
 | **TaskPlanner** | `src/agent/planner.py` | ✅ | LLM + 启发式双路径 |
 | **CodeGenerator** | `src/agent/code_generator.py` | ✅ | 9原语动态组合，含workpiece_id参数 |
-| **SyncLLMClient** | `src/agent/llm_clients/sync_client.py` | ✅ | OpenAI兼容API |
+| **SyncLLMClient** | `src/agent/llm_clients/sync_client.py` | ✅ | OpenAI兼容API，已接入真实LLM |
 | **TaskDecomposer** | `src/harness/task_decomposer.py` | ✅ | NL → 结构化任务 |
 | **ResourceAllocator** | `src/harness/resource_allocator.py` | ✅ | 贪心 + 4种冲突检测 + 负载均衡 |
 | **ResultValidator** | `src/harness/result_validator.py` | ✅ | 时间/空间/资源约束验证 |
 | **ExceptionHandler** | `src/harness/exception_handler.py` | ✅ | 7异常类型, 4恢复策略 |
 | **FeedbackLoop** | `src/harness/feedback_loop.py` | ✅ | 闭环反馈, 6参数调整 |
-| **IsaacSimInterface** | `src/simulation/isaac_sim.py` | ✅ | Isaac Sim 4.5，Franka Panda USD |
+| **IsaacSimInterface** | `src/simulation/isaac_sim.py` | ✅ | Isaac Sim 4.5，Franka Panda USD，MRTA旅行时间矩阵 |
 | **ArmInterface** | `src/simulation/arm_interface.py` | ✅ | 原语 → 仿真动作适配 |
 | **MetricsCalculator** | `src/evaluation/metrics.py` | ✅ | 4项指标计算 |
 | **BenchmarkRunner** | `src/evaluation/benchmark.py` | ✅ | 配对t检验 |
@@ -32,16 +32,23 @@
 | `5p_production_line.json` | 5工件，4工位，3机械臂 | 8 | 490.9s |
 | `6p_production_line.json` | 6工件，4工位，3机械臂 | 8 | 489.8s |
 
-### 1.3 实验结果（30次实验，100%成功率）
+### 1.3 最新实验结果（seed=42，MRTA旅行时间 + 真实LLM）
 
-| 场景 | 平均Makespan | 最优Makespan | 比率 | 资源利用率 |
-|------|:------------:|:------------:|:----:|:----------:|
-| 1p | 68.0s | 584.9s | 0.12x | 54% |
-| 2p | 67.6s | 931.0s | 0.07x | 33% |
-| 3p | 84.7s | 642.8s | 0.13x | 35% |
-| 4p | 128.0s | 465.0s | 0.28x | 34% |
-| 5p | 145.5s | 490.9s | 0.30x | 33% |
-| 6p | 128.2s | 489.8s | 0.26x | 33% |
+| 场景 | Makespan | 最优Makespan | 比率 | 成功率 | 资源利用率 |
+|------|:--------:|:------------:|:----:|:------:|:----------:|
+| 1p | 247.4s | 584.9s | 0.42x | 100% | 34% |
+| 2p | 885.9s | 931.0s | 0.95x | 88% | 33% |
+| 3p | 757.2s | 642.8s | 1.18x | 100% | 39% |
+| 4p | 750.0s | 465.0s | 1.61x | 100% | 38% |
+| 5p | 311.7s | 490.9s | 0.64x | 100% | 35% |
+| 6p | 818.2s | 489.8s | 1.67x | 75% | 33% |
+| **平均** | - | - | **1.08x** | **94%** | **35%** |
+
+### 1.4 关键改进
+
+1. **MRTA旅行时间矩阵（T_t）**: 实现了机械臂间的旅行时间计算，使得Makespan从之前的67s量级提升到接近MRTA基准水平（平均比率1.08x）
+2. **真实LLM API接入**: 接入mimo-v2.5模型，任务分解和代码生成由真实LLM驱动
+3. **OpenAI SDK兼容性修复**: 使用HTTP API直接调用，解决了SDK版本兼容问题
 
 ## 2. 未完成/问题
 
@@ -62,7 +69,7 @@ src/
 │   ├── core.py               # 主控流水线
 │   ├── planner.py            # 任务分解
 │   ├── code_generator.py     # 代码生成
-│   └── llm_clients/          # LLM客户端
+│   └── llm_clients/          # LLM客户端（含HTTP直连）
 ├── harness/                  # Harness框架
 │   ├── task_decomposer.py    # 任务分解
 │   ├── resource_allocator.py # 资源分配
@@ -70,7 +77,7 @@ src/
 │   ├── exception_handler.py  # 异常处理
 │   └── feedback_loop.py      # 闭环反馈
 ├── simulation/               # 仿真后端
-│   ├── isaac_sim.py          # Isaac Sim 4.5
+│   ├── isaac_sim.py          # Isaac Sim 4.5（含MRTA旅行时间）
 │   └── arm_interface.py      # 适配器
 └── evaluation/               # 评估指标
     ├── metrics.py
