@@ -6,8 +6,6 @@
 
 系统由四层组成：
 
-![Architecture](assets/architecture.png)
-
 ```
 用户输入 (自然语言指令 + 场景配置)
     │
@@ -26,7 +24,7 @@
                 │
 ┌───────────────▼─────────────────┐
 │         仿真执行层                │
-│  MockSimulator / IsaacSim       │
+│  Isaac Sim 4.5 (PhysX物理)      │
 └───────────────┬─────────────────┘
                 │
 ┌───────────────▼─────────────────┐
@@ -183,28 +181,20 @@ graph LR
 
 ### 仿真器选择
 
-系统支持 4 种仿真后端，统一接口，无缝切换：
+系统支持三种仿真后端，当前主要使用 Isaac Sim：
 
 | 仿真器 | 环境要求 | 物理引擎 | 用途 |
 |--------|---------|---------|------|
-| **MockSimulator** | CPU 即可 | 无 | 开发调试、CI/CD、逻辑验证 |
-| **IsaacSimInterface** | NVIDIA RTX GPU | PhysX 5 | 物理级仿真验证（碰撞、力学） |
-| **OmniverseInterface** | NVIDIA RTX GPU | PhysX 5 | 场景渲染 + 仿真 |
-| **IsaacLabInterface** | NVIDIA RTX GPU | PhysX 5 | RL 训练 + 批量评估 |
+| **IsaacSimInterface** | NVIDIA RTX GPU | PhysX | 物理级仿真验证（默认） |
+| OmniverseInterface | NVIDIA RTX GPU | PhysX | 场景渲染 + 仿真 |
+| IsaacLabInterface | NVIDIA RTX GPU | PhysX | RL训练 + 批量评估 |
 
-**任务要求**：系统需"接入 Isaac Sim、Omniverse 或 Isaac Lab 仿真接口完成执行验证"。
-三种 GPU 后端均已实现，未安装时自动回退到 MockSimulator。
+- **物理仿真**：Isaac Sim + PhysX + Franka Panda USD模型
+- **IK控制**：Jacobian伪逆求解关节角度
+- **帧捕获**：Omni Replicator + H.264编码
 
-- **开发阶段**：用 MockSimulator 在 CPU 上验证调度逻辑
-- **最终验证**：用 Isaac Sim / Omniverse / Isaac Lab 在 GPU 上进行物理仿真
-
-切换后端只需修改 `--sim` 参数：
+运行仿真：
 
 ```bash
-python scripts/run_simulation.py --scenario ... --sim mock       # 默认
-python scripts/run_simulation.py --scenario ... --sim isaac      # Isaac Sim
-python scripts/run_simulation.py --scenario ... --sim omniverse  # Omniverse
-python scripts/run_simulation.py --scenario ... --sim isaac_lab  # Isaac Lab
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 ```
-
-无 GPU 时可使用云端 GPU 实例（如 AWS EC2 G5/P4d，NVIDIA A10G/A100）。

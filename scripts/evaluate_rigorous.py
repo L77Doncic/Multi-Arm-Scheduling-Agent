@@ -11,8 +11,8 @@ Key requirements from top-tier ML conferences:
 6. Statistical significance tests (paired t-test)
 
 Usage:
-    python scripts/evaluate_rigorous.py --scenario data/scenarios/assembly_line_4station.yaml
-    python scripts/evaluate_rigorous.py --scenario data/scenarios/assembly_line_4station.yaml --runs 10
+    python scripts/evaluate_rigorous.py --scenario data/scenarios/1p_production_line.json
+    python scripts/evaluate_rigorous.py --scenario data/scenarios/1p_production_line.json --runs 10
 """
 
 import argparse

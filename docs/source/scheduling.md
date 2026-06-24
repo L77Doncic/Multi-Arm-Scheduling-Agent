@@ -4,16 +4,19 @@
 
 ## 分配策略
 
-分配采用**贪心算法**，综合考虑两个因素：
+分配采用**贪心算法**，综合考虑三个因素：
 
 ```
-score = capability_match × 0.7 + load_balance × 0.3
+score = capability_weight × cap_score + workload_weight × balance_score + priority_weight × priority_score
 ```
+
+默认权重：`capability=0.6, workload=0.3, priority=0.1`
 
 | 因素 | 权重 | 说明 |
 |------|------|------|
-| 能力匹配 | 70% | 机械臂能力覆盖任务需求的比例 |
+| 能力匹配 | 60% | 机械臂能力覆盖任务需求的比例 |
 | 负载均衡 | 30% | 优先分配给当前负载较低的臂 |
+| 任务优先级 | 10% | 高优先级任务优先分配 |
 
 ### 能力匹配
 
@@ -64,14 +67,14 @@ from agent.core import SchedulingAgent
 
 agent = SchedulingAgent(config)
 
-# 分解任务
-tasks = agent.decompose_task(instruction, scene_config)
-
-# 分配资源
-allocation = agent.allocate_resources(tasks)
+# 执行完整调度流水线
+result = agent.execute_scheduling(
+    instruction=instruction,
+    scene_config=scene_config,
+)
 
 # 查看分配结果
-for task_id, arm_id in allocation.items():
+for task_id, arm_id in result.allocation.items():
     arm = agent.robot_arms[arm_id]
     print(f"{task_id} → {arm.name} ({arm_id})")
 ```
@@ -109,9 +112,5 @@ arm_dicts = [
 
 allocation = allocator.allocate(task_dicts, arm_dicts)
 # → {"t1": "arm1", "t2": "arm1"}
-
-# 冲突检测
-conflicts = allocator._detect_conflicts(allocation)
-if conflicts:
-    allocation = allocator.resolve_conflicts(conflicts, task_dicts, arm_dicts)
+# allocate() 内部自动检测并解决冲突
 ```

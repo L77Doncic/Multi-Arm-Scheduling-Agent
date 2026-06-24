@@ -142,10 +142,8 @@ evaluation:
 
 # Simulation Configuration
 simulation:
-  # Backend: "isaac" (default, real physics) or "mock" (no GPU, testing only)
+  # Backend: "isaac" (NVIDIA Isaac Sim, real physics)
   backend: "isaac"
-  mock:
-    failure_probability: 0.05
 
 # Logging Configuration
 logging:

@@ -15,10 +15,10 @@ LLM-driven multi-arm robotic scheduling system. Takes natural language + scene c
 pip install -r requirements.txt && pip install -e .
 
 # Run simulation (mock backend, no GPU)
-python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 
 # Run simulation with specific backend
-python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml --sim mock|isaac|omniverse|isaac_lab
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json --sim isaac
 
 # Tests
 python -m pytest tests/ -v
@@ -26,7 +26,7 @@ python -m pytest tests/unit/test_basic.py -v                    # single test fi
 python -m pytest tests/ --cov=src --cov-report=html             # with coverage
 
 # Rigorous evaluation (NeurIPS standard, paired t-test)
-python scripts/evaluate_rigorous.py --scenario data/scenarios/assembly_line_4station.yaml --runs 5
+python scripts/evaluate_rigorous.py --scenario data/scenarios/1p_production_line.json --runs 5
 
 # MRTA-Benchmark evaluation
 python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
@@ -52,10 +52,8 @@ Four packages under `src/`:
 
 **`simulation/`** — Simulation backends
 - `base.py`: `SimulationInterface` ABC (initialize, load_scene, execute_action, get_state, step, reset, close)
-- `mock_simulator.py`: pure Python, no GPU, configurable failure rates
-- `isaac_sim.py` / `omniverse.py` / `isaac_lab.py`: GPU backends (require NVIDIA Isaac Sim/Lab)
+- `isaac_sim.py`: Isaac Sim 4.5 physics simulation (Franka Panda USD, PhysX, IK control)
 - `arm_interface.py`: adapter bridging generated code primitives → simulation backend actions
-- `scene_builder.py`: constructs scenes from YAML config
 
 **`evaluation/`** — Metrics and benchmarking
 - `metrics.py`: `MetricsCalculator` — makespan, success rate, utilization, violations
@@ -90,12 +88,12 @@ API keys via environment variables or `.env` file (see `.env.example`):
 
 ## Testing Notes
 
-Tests use `sys.path.insert(0, ...)` to add `src/` to the path (not package imports). Test files are in `tests/unit/`. The end-to-end integration test in `test_basic.py` exercises the full pipeline with MockSimulator.
+Tests use `sys.path.insert(0, ...)` to add `src/` to the path (not package imports). Test files are in `tests/unit/`. The end-to-end integration test in `test_basic.py` exercises the full pipeline with IsaacSimInterface.
 
 ## Scenarios
 
-- `data/scenarios/assembly_line_4station.yaml`: 4 stations, 2 workpieces, 3 arms, MILP-optimal makespan 25.0s
-- `data/scenarios/complex_assembly.yaml`: 5 stations, 3 workpieces, parallel operations, resource contention
+- `data/scenarios/1p_production_line.json`: 1 workpiece, 4 stations, 3 arms, MILP-optimal makespan 584.9s
+- `data/scenarios/2p_production_line.json` - `6p_production_line.json`: 2-6 workpieces, 4 stations, 3 arms
 - `data/datasets/MRTA-Benchmark/`: 13 APEX-MR LEGO assembly tasks (RSS 2025)
 
 ## Documentation

@@ -1,7 +1,7 @@
 # Simulation Configuration
 
 simulation:
-  # Backend: "isaac" (NVIDIA Isaac Sim, real physics) or "mock" (software only, testing)
+  # Backend: "isaac" (NVIDIA Isaac Sim, real physics)
   backend: "isaac"
 
   # Physics settings
@@ -10,18 +10,10 @@ simulation:
     gravity: [0, 0, -9.81]
     solver_iterations: 10
 
-  # Mock simulator settings
-  mock:
-    failure_probability: 0.05
-    record_trace: true
-    time_acceleration: 100.0  # Speed up simulation by this factor
-
   # Isaac Sim settings
   isaac_sim:
     headless: true
     device: "cuda:0"
-    scene_path: "scenes/default.usd"
-    robot_asset_path: "assets/robots/"
 
   # Scene settings
   scene:

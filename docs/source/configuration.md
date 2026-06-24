@@ -11,10 +11,11 @@
 ```yaml
 llm:
   provider: "openai"                              # openai / anthropic
-  model: "deepseek-ai/DeepSeek-V4-Flash"          # 模型名称
-  api_base: "https://api-inference.modelscope.cn/v1"
+  model: "mimo-v2.5"                              # 模型名称
+  api_base: "https://token-plan-cn.xiaomimimo.com/v1"
   api_key_env: "OPENAI_API_KEY"                   # 从环境变量读取密钥
   temperature: 0.7
+  top_p: 0.9
   max_tokens: 4096
   max_retries: 3
   retry_delay: 1.0
@@ -108,72 +109,84 @@ evaluation:
 
 ```yaml
 simulation:
-  backend: "mock"           # mock / isaac / omniverse / isaac_lab
+  backend: "isaac"           # isaac (Isaac Sim 4.5)
 
-  mock:
-    failure_probability: 0.05
-    record_trace: true
-    time_acceleration: 1.0
+  physics:
+    timestep: 0.01
+    gravity: [0, 0, -9.81]
+    solver_iterations: 10
 
   isaac_sim:
     headless: true
     device: "cuda:0"
 
+  scene:
+    bounds:
+      x_min: -5.0
+      x_max: 10.0
+      y_min: -5.0
+      y_max: 5.0
+      z_min: 0.0
+      z_max: 5.0
+    lighting:
+      type: "dome"
+      intensity: 1000
+
   execution:
     max_steps: 10000
     timeout: 300.0
+    real_time_factor: 0.0
 ```
 
 ## 场景配置
 
-场景定义在 `data/scenarios/` 的 YAML 文件中：
+场景定义在 `data/scenarios/` 的 JSON 文件中：
 
-```yaml
-scenario:
-  name: "4-Station Assembly Line"
-
-  stations:
-    - id: "station_1"
-      name: "Pick & Load"
-      position: { x: 0.0, y: 0.0, z: 0.0 }
-      capabilities_required: ["pick", "place"]
-      operation: "pick_workpiece_from_feed"
-      estimated_duration: 3.0
-      predecessors: []
-      successors: ["station_2"]
-
-  workpieces:
-    - id: "wp_A"
-      type: "assembly_part_A"
-      initial_position: { x: -1.0, y: -0.5, z: 0.5 }
-      operations_sequence: ["station_1", "station_2", "station_3", "station_4"]
-      priority: 1
-
-  robot_arms:
-    - id: "arm_001"
-      capabilities: ["pick", "place", "move", "assemble", "gripper"]
-      base_position: { x: 1.0, y: -1.5, z: 0.0 }
-
-  constraints:
-    - type: "temporal"
-      description: "Sequential station visits per workpiece"
-      hard: true
-    - type: "resource"
-      description: "One workpiece per arm at a time"
-      hard: true
-    - type: "spatial"
-      min_separation: 0.3
-      hard: true
-
-  instruction: >
-    Two workpieces need to be assembled on a 4-station line.
-    Coordinate three arms to minimize completion time.
-
-  optimal_schedule:
-    source: "MILP-optimal (constructed for this scenario)"
-    method: "Mixed Integer Linear Programming"
-    makespan: 25.0
+```json
+{
+  "scenario": {
+    "name": "MRTA-1p-ProductionLine",
+    "instruction": "Execute a 4-station production line with 2 workpieces...",
+    "stations": [
+      {
+        "id": "station_feed",
+        "name": "Feed Station",
+        "position": {"x": 0, "y": 0, "z": 0},
+        "capabilities_required": ["pick"],
+        "operation": "feed"
+      }
+    ],
+    "workpieces": [
+      {
+        "id": "workpiece_1",
+        "type": "generic",
+        "initial_position": {"x": 0, "y": 0, "z": 0.5}
+      }
+    ],
+    "robot_arms": [
+      {
+        "id": "arm_001",
+        "capabilities": ["pick", "place", "move"],
+        "base_position": {"x": 1.0, "y": 0, "z": 0}
+      }
+    ],
+    "optimal_schedule": {
+      "makespan": 584.9
+    }
+  }
+}
 ```
+
+可用场景（基于MRTA-Benchmark格式）：
+
+| 场景文件 | 说明 | 最优Makespan |
+|----------|------|:------------:|
+| 1p_production_line.json | 1工件，4工位，3机械臂 | 584.9s |
+| 2p_production_line.json | 2工件，4工位，3机械臂 | 931.0s |
+| 3p_production_line.json | 3工件，4工位，3机械臂 | 642.8s |
+| 4p_production_line.json | 4工件，4工位，3机械臂 | 465.0s |
+| 5p_production_line.json | 5工件，4工位，3机械臂 | 490.9s |
+| 6p_production_line.json | 6工件，4工位，3机械臂 | 489.8s |
 
 ## 环境变量
 

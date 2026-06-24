@@ -14,21 +14,21 @@ Multi-Arm Scheduling Agent 是一个由大语言模型驱动的工业多机械�
 
 | 特性 | 描述 |
 |------|------|
-| 🧠 **LLM 驱动调度** | DeepSeek-V4-Flash 分解指令为任务 DAG；LLM 不可用时回退到启发式 |
+| 🧠 **LLM 驱动调度** | mimo-v2.5 分解指令为任务 DAG；LLM 不可用时回退到启发式 |
 | 🎯 **动态代码生成** | 基于 9 种原子原语按需组合生成执行代码，不依赖预置固定技能库 |
-| 🔄 **闭环反馈** | 仿真结果实时回传 Harness，动态调整超时、重试、资源权重等参数 |
-| 🔌 **多仿真后端** | Mock / Isaac Sim / Omniverse / Isaac Lab 四种后端无缝切换 |
+| 🔄 **闭环反馈** | 仿真结果实时回传 Harness，动态调整超时、重试、资源权重等6个参数 |
+| 🔌 **物理仿真** | Isaac Sim 4.5 + PhysX + Franka Panda USD模型 |
 | 📊 **严格评估** | makespan / 成功率 / 利用率 / 违反次数 + 配对 t 检验 |
 
 ## 快速预览
 
 ```python
-import yaml
+import json
 from agent.core import SchedulingAgent
 
 # 加载配置和场景
 config = yaml.safe_load(open("configs/agent_config.yaml"))
-scene = yaml.safe_load(open("data/scenarios/assembly_line_4station.yaml"))["scenario"]
+scene = json.load(open("data/scenarios/1p_production_line.json"))["scenario"]
 
 # 创建智能体并执行
 agent = SchedulingAgent(config)
@@ -51,7 +51,7 @@ print(f"Violations: {result.constraint_violations}")  # 约束违反次数
 | [Task Decomposition](tasks.md) | 从自然语言到结构化任务 |
 | [Scheduling](scheduling.md) | 资源分配与调度策略 |
 | [Code Generation](code_generation.md) | 原子原语与动态代码生成 |
-| [Simulation](simulation.md) | Mock / Isaac Sim / Omniverse / Isaac Lab |
+| [Simulation](simulation.md) | Isaac Sim 4.5 物理仿真 |
 | [Evaluation](evaluation.md) | 指标计算与基准对比 |
 | [Harness Framework](harness.md) | 闭环反馈与异常处理 |
 | [Configuration](configuration.md) | 配置文件说明 |

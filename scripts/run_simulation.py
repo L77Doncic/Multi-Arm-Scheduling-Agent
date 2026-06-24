@@ -6,13 +6,12 @@ Executes the multi-arm scheduling pipeline on a given scenario:
   1. Load scenario configuration
   2. Initialize the scheduling agent
   3. Run task decomposition + resource allocation + code generation
-  4. Execute in simulation (mock or Isaac Sim)
+  4. Execute in Isaac Sim physics simulation
   5. Collect metrics and generate report
 
 Usage:
-    python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml
-    python scripts/run_simulation.py --scenario data/scenarios/complex_assembly.yaml --sim mock
-    python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml --verbose
+    python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
+    python scripts/run_simulation.py --scenario data/scenarios/2p_production_line.json --verbose
 """
 
 import argparse
@@ -61,20 +60,7 @@ def load_agent_config(config_path: str = "configs/agent_config.yaml") -> dict:
 
 
 def create_simulation(sim_type: str, scene_config: dict):
-    """Create simulation interface. Isaac Sim is the default; mock only if explicitly requested."""
-    if sim_type == "mock":
-        from simulation.mock_simulator import MockSimulator
-
-        sim = MockSimulator(
-            failure_probabilities={},
-            time_scale=1.0,
-            seed=42,
-        )
-        sim.initialize()
-        sim.load_scene(scene_config)
-        logging.info("Using mock simulator (no real physics)")
-        return sim
-
+    """Create simulation interface. Isaac Sim is the default backend."""
     if sim_type == "isaac":
         from simulation.isaac_sim import IsaacSimInterface
 

@@ -57,13 +57,7 @@ execution_log = [
 
 ### 加载MRTA-Benchmark
 
-首先下载数据集：
-
-```bash
-python scripts/download_dataset.py
-```
-
-然后加载：
+数据集位于 `data/datasets/MRTA-Benchmark/`，加载方式：
 
 ```python
 from evaluation.mrta_loader import MRTABenchmarkLoader, get_optimal_makespans
@@ -112,17 +106,14 @@ print(report.improvements)        # 相对改进百分比
 ## 使用评估脚本
 
 ```bash
-# 全量评估
-python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json
+# 运行所有实验（6个场景 × 5个种子 = 30次）
+python scripts/run_all_experiments.py
 
-# 单场景评估
-python scripts/evaluate.py --scenario data/scenarios/assembly_line_4station.yaml
+# 运行单个实验
+python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
 
-# 指定基线方法
-python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json --baselines random,greedy
-
-# 详细输出
-python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json --verbose
+# 运行仿真
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 ```
 
 ### 输出报告
@@ -134,13 +125,13 @@ python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json --verbose
     "agent_results": [...],
     "baseline_results": {"random": [...], "greedy": [...]},
     "agent_aggregate": {
-        "avg_makespan": 0.14,
+        "avg_makespan": 103.7,
         "avg_success_rate": 1.0,
-        "avg_resource_util": 0.545,
-        "total_violations": 1
+        "avg_resource_util": 0.37,
+        "total_violations": 0
     },
     "baseline_aggregates": {...},
-    "timestamp": "2026-06-19 21:00:00"
+    "timestamp": "2026-06-24 20:00:00"
 }
 ```
 

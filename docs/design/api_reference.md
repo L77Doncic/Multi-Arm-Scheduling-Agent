@@ -62,7 +62,7 @@ SchedulingAgent(config: Dict[str, Any])
 |------|------|:----:|------|
 | `instruction` | `str` | ✅ | 自然语言指令 |
 | `scene_config` | `dict` | ❌ | 场景配置 |
-| `simulation` | `SimulationInterface` | ❌ | 仿真器，None 时自动创建 MockSimulator |
+| `simulation` | `SimulationInterface` | ❌ | 仿真器，None 时自动创建 IsaacSimInterface |
 
 #### `get_performance_metrics() -> Dict[str, float]`
 
@@ -287,12 +287,9 @@ TaskPlanner(config: Dict[str, Any], llm_client=None)
 
 | 类 | 后端 | GPU 需求 |
 |----|------|:--------:|
-| `MockSimulator` | 纯 Python | ❌ |
-| `IsaacSimInterface` | Isaac Sim | ✅ |
-| `OmniverseInterface` | Omniverse | ✅ |
-| `IsaacLabInterface` | Isaac Lab | ✅ |
+| `IsaacSimInterface` | Isaac Sim 4.5 | ✅ RTX GPU |
 
-所有 GPU 后端支持 `fallback_to_mock=True`，未安装时自动回退。
+当前仅支持 Isaac Sim 作为仿真后端。
 
 ---
 

@@ -11,7 +11,7 @@ Multi-Arm Scheduling Agent 是一个基于大语言模型（LLM）的多机械�
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         用户输入                                  │
-│            自然语言指令 + 产线场景配置 (YAML)                      │
+│            自然语言指令 + 产线场景配置 (JSON)                      │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -26,7 +26,7 @@ Multi-Arm Scheduling Agent 是一个基于大语言模型（LLM）的多机械�
 │         ▼                  ▼                     ▼               │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │              Simulation Execution                          │  │
-│  │  ArmInterface → MockSimulator / IsaacSim / Omniverse / Lab │  │
+│  │  ArmInterface → IsaacSim (PhysX物理仿真)                   │  │
 │  └──────────────────────────────┬────────────────────────────┘  │
 │                                 │                                │
 │         ┌───────────────────────┼───────────────────┐            │
@@ -64,7 +64,7 @@ LLM 驱动的智能体核心，负责任务理解和代码生成。
 | `SchedulingAgent` | `core.py` | 主调度器，编排完整 6 步管线 |
 | `TaskPlanner` | `planner.py` | LLM/启发式任务分解，生成依赖图 |
 | `CodeGenerator` | `code_generator.py` | LLM/模板代码生成，基于 9 个原子原语 |
-| `SyncLLMClient` | `llm_clients/sync_client.py` | 同步 LLM 客户端（ModelScope API） |
+| `SyncLLMClient` | `llm_clients/sync_client.py` | 同步 LLM 客户端（OpenAI 兼容 API） |
 | `Prompts` | `prompts/*.py` | 任务分解、资源分配、代码生成的提示词模板 |
 
 ### 3.2 Harness 模块 (`src/harness/`)
@@ -81,16 +81,14 @@ LLM 驱动的智能体核心，负责任务理解和代码生成。
 
 ### 3.3 Simulation 模块 (`src/simulation/`)
 
-统一仿真接口，支持 4 种后端无缝切换。
+统一仿真接口，支持三种后端，当前主要使用 Isaac Sim。
 
 | 组件 | 文件 | 职责 |
 |------|------|------|
 | `SimulationInterface` | `base.py` | 抽象仿真接口 |
-| `MockSimulator` | `mock_simulator.py` | 纯 Python 软件仿真（无需 GPU） |
-| `IsaacSimInterface` | `isaac_sim.py` | NVIDIA Isaac Sim 后端 |
-| `OmniverseInterface` | `omniverse.py` | NVIDIA Omniverse Kit 后端 |
-| `IsaacLabInterface` | `isaac_lab.py` | NVIDIA Isaac Lab 后端 |
-| `SceneBuilder` | `scene_builder.py` | 场景构建器 |
+| `IsaacSimInterface` | `isaac_sim.py` | Isaac Sim 4.5 物理仿真（默认） |
+| `OmniverseInterface` | `omniverse.py` | Omniverse Kit 后端 |
+| `IsaacLabInterface` | `isaac_lab.py` | Isaac Lab 后端 |
 | `ArmInterface` | `arm_interface.py` | 原子原语 → 仿真动作适配器 |
 
 ### 3.4 Evaluation 模块 (`src/evaluation/`)
@@ -142,10 +140,11 @@ Step 6: 指标计算 (MetricsCalculator)
 ```yaml
 llm:
   provider: "openai"                          # OpenAI 兼容 API
-  model: "deepseek-ai/DeepSeek-V4-Flash"      # ModelScope 模型
-  api_base: "https://api-inference.modelscope.cn/v1"
+  model: "mimo-v2.5"                          # Xiaomi MiMo 模型
+  api_base: "https://token-plan-cn.xiaomimimo.com/v1"
   api_key: "your-api-key"
   temperature: 0.7
+  top_p: 0.9
   max_tokens: 4096
 ```
 
@@ -172,31 +171,22 @@ result = client.generate_structured(
 )
 ```
 
-## 6. 仿真后端选择
+## 6. 仿真后端
 
-| 后端 | GPU 需求 | 物理引擎 | 渲染 | 使用场景 |
-|------|:--------:|----------|------|----------|
-| `mock` | ❌ | 无 | 无 | 开发调试、CI/CD、逻辑验证 |
-| `isaac` | ✅ | PhysX 5 | RTX | 物理级验证（碰撞、力学） |
-| `omniverse` | ✅ | PhysX 5 | RTX | 场景渲染 + 仿真 |
-| `isaac_lab` | ✅ | PhysX 5 | RTX | RL 训练 + 批量评估 |
+当前主要使用 Isaac Sim 4.5 作为仿真后端：
 
-### 切换后端
+| 后端 | GPU 需求 | 物理引擎 | 使用场景 |
+|------|:--------:|----------|----------|
+| `isaac` | ✅ RTX GPU | PhysX | 物理级验证（碰撞、力学） |
 
-所有后端实现统一的 `SimulationInterface`，切换无需修改代码：
+### 使用 Isaac Sim
 
 ```python
-# Mock（默认）
-sim = MockSimulator(time_scale=1.0, seed=42)
+from simulation.isaac_sim import IsaacSimInterface
 
-# Isaac Sim（自动回退到 Mock 如果未安装）
-sim = IsaacSimInterface(fallback_to_mock=True)
-
-# Omniverse
-sim = OmniverseInterface(fallback_to_mock=True)
-
-# Isaac Lab
-sim = IsaacLabInterface(fallback_to_mock=True, headless=True, device="cuda:0")
+sim = IsaacSimInterface(fallback_to_mock=False)
+sim.initialize()
+sim.load_scene(scene_config)
 ```
 
 ## 7. 关键设计决策

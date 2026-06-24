@@ -6,9 +6,8 @@ Runs the scheduling agent on benchmark scenarios and compares against
 baseline methods (random, greedy, genetic/optimal).
 
 Usage:
-    python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json
-    python scripts/evaluate.py --scenario data/scenarios/assembly_line_4station.yaml
-    python scripts/evaluate.py --dataset data/datasets/mrta_benchmark.json --baselines random,greedy
+    python scripts/evaluate.py --scenario data/scenarios/1p_production_line.json
+    python scripts/evaluate.py --scenario data/scenarios/2p_production_line.json --baselines random,greedy
 """
 
 import argparse
