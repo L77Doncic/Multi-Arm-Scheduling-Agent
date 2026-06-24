@@ -4,9 +4,10 @@ OpenAI LLM Client Implementation
 This module implements the OpenAI API client for GPT models.
 """
 
-import os
 import logging
-from typing import Dict, List, Optional, Any
+import os
+from typing import Any, Dict, List, Optional
+
 from openai import AsyncOpenAI
 
 from .base import BaseLLMClient, LLMMessage, LLMResponse
@@ -23,11 +24,11 @@ class OpenAIClient(BaseLLMClient):
 
     # Pricing per 1K tokens (as of 2024)
     PRICING = {
-        'gpt-4-turbo': {'input': 0.01, 'output': 0.03},
-        'gpt-4': {'input': 0.03, 'output': 0.06},
-        'gpt-4-32k': {'input': 0.06, 'output': 0.12},
-        'gpt-3.5-turbo': {'input': 0.0005, 'output': 0.0015},
-        'gpt-3.5-turbo-16k': {'input': 0.003, 'output': 0.004},
+        "gpt-4-turbo": {"input": 0.01, "output": 0.03},
+        "gpt-4": {"input": 0.03, "output": 0.06},
+        "gpt-4-32k": {"input": 0.06, "output": 0.12},
+        "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
+        "gpt-3.5-turbo-16k": {"input": 0.003, "output": 0.004},
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -45,21 +46,18 @@ class OpenAIClient(BaseLLMClient):
         super().__init__(config)
 
         # Get API key from config or environment
-        api_key = config.get('api_key') or os.environ.get('OPENAI_API_KEY')
+        api_key = config.get("api_key") or os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError(
                 "OpenAI API key must be provided in config or OPENAI_API_KEY environment variable"
             )
 
         # Initialize client
-        base_url = config.get('base_url')
-        self.client = AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
+        base_url = config.get("base_url")
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
         # Set model
-        self.model = config.get('model', 'gpt-4-turbo')
+        self.model = config.get("model", "gpt-4-turbo")
 
         logger.info(f"OpenAI client initialized with model: {self.model}")
 
@@ -68,7 +66,7 @@ class OpenAIClient(BaseLLMClient):
         messages: List[LLMMessage],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Send a chat request to OpenAI.
@@ -92,20 +90,20 @@ class OpenAIClient(BaseLLMClient):
 
         # Prepare parameters
         params = {
-            'model': self.model,
-            'messages': [msg.to_dict() for msg in messages],
-            'temperature': temperature or self.temperature,
-            'max_tokens': max_tokens or self.max_tokens,
-            'top_p': kwargs.get('top_p', self.top_p),
+            "model": self.model,
+            "messages": [msg.to_dict() for msg in messages],
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
+            "top_p": kwargs.get("top_p", self.top_p),
         }
 
         # Add optional parameters
-        if 'frequency_penalty' in kwargs:
-            params['frequency_penalty'] = kwargs['frequency_penalty']
-        if 'presence_penalty' in kwargs:
-            params['presence_penalty'] = kwargs['presence_penalty']
-        if 'stop' in kwargs:
-            params['stop'] = kwargs['stop']
+        if "frequency_penalty" in kwargs:
+            params["frequency_penalty"] = kwargs["frequency_penalty"]
+        if "presence_penalty" in kwargs:
+            params["presence_penalty"] = kwargs["presence_penalty"]
+        if "stop" in kwargs:
+            params["stop"] = kwargs["stop"]
 
         try:
             logger.debug(f"Sending chat request with {len(messages)} messages")
@@ -116,9 +114,9 @@ class OpenAIClient(BaseLLMClient):
             # Extract response
             choice = response.choices[0]
             usage = {
-                'prompt_tokens': response.usage.prompt_tokens,
-                'completion_tokens': response.usage.completion_tokens,
-                'total_tokens': response.usage.total_tokens,
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
             }
 
             # Calculate cost
@@ -131,7 +129,7 @@ class OpenAIClient(BaseLLMClient):
                 model=response.model,
                 usage=usage,
                 finish_reason=choice.finish_reason,
-                metadata={'cost': cost}
+                metadata={"cost": cost},
             )
 
             # Update usage statistics
@@ -153,7 +151,7 @@ class OpenAIClient(BaseLLMClient):
         prompt: str,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Send a completion request to OpenAI.
@@ -184,10 +182,10 @@ class OpenAIClient(BaseLLMClient):
         Returns:
             Cost in USD.
         """
-        pricing = self.PRICING.get(self.model, self.PRICING.get('gpt-4-turbo'))
+        pricing = self.PRICING.get(self.model, self.PRICING.get("gpt-4-turbo"))
 
-        input_cost = (usage['prompt_tokens'] / 1000) * pricing['input']
-        output_cost = (usage['completion_tokens'] / 1000) * pricing['output']
+        input_cost = (usage["prompt_tokens"] / 1000) * pricing["input"]
+        output_cost = (usage["completion_tokens"] / 1000) * pricing["output"]
 
         return input_cost + output_cost
 
@@ -199,12 +197,12 @@ class OpenAIClient(BaseLLMClient):
             Dictionary containing model information.
         """
         return {
-            'provider': 'openai',
-            'model': self.model,
-            'max_tokens': self.max_tokens,
-            'temperature': self.temperature,
-            'total_cost': self._total_cost,
-            'total_tokens': self._total_tokens,
+            "provider": "openai",
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "total_cost": self._total_cost,
+            "total_tokens": self._total_tokens,
         }
 
     async def stream_chat(
@@ -212,7 +210,7 @@ class OpenAIClient(BaseLLMClient):
         messages: List[LLMMessage],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Stream a chat response from OpenAI.
@@ -232,12 +230,12 @@ class OpenAIClient(BaseLLMClient):
 
         # Prepare parameters
         params = {
-            'model': self.model,
-            'messages': [msg.to_dict() for msg in messages],
-            'temperature': temperature or self.temperature,
-            'max_tokens': max_tokens or self.max_tokens,
-            'top_p': kwargs.get('top_p', self.top_p),
-            'stream': True,
+            "model": self.model,
+            "messages": [msg.to_dict() for msg in messages],
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
+            "top_p": kwargs.get("top_p", self.top_p),
+            "stream": True,
         }
 
         try:

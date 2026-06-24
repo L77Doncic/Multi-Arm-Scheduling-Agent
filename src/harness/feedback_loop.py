@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FeedbackData:
     """Raw feedback collected from a single task execution."""
+
     timestamp: float
     task_id: str
     arm_id: str
@@ -37,14 +38,16 @@ class FeedbackData:
 @dataclass
 class AnalysisResult:
     """Outcome of analysing a batch of feedback data."""
-    performance_score: float          # 0.0 - 1.0
-    bottlenecks: List[str]            # human-readable bottleneck descriptions
-    recommendations: List[str]        # actionable recommendations
+
+    performance_score: float  # 0.0 - 1.0
+    bottlenecks: List[str]  # human-readable bottleneck descriptions
+    recommendations: List[str]  # actionable recommendations
 
 
 @dataclass
 class StrategyAdjustment:
     """A single parameter adjustment recommended by the feedback loop."""
+
     target_module: str
     parameter: str
     old_value: Any
@@ -59,10 +62,13 @@ class StrategyAdjustment:
 
 class StrategyParameter(Enum):
     """Names of strategy parameters that can be adjusted."""
+
     TIMEOUT_ADJUSTMENT = "timeout_adjustment"
     RETRY_COUNT = "retry_count"
     RESOURCE_WEIGHT = "resource_weight"
     PRIORITY_BOOST = "priority_boost"
+    CODE_GEN_SPEED_FACTOR = "code_gen_speed_factor"
+    CODE_GEN_FORCE_FACTOR = "code_gen_force_factor"
 
 
 # ------------------------------------------------------------------
@@ -85,6 +91,8 @@ class FeedbackLoop:
         StrategyParameter.RETRY_COUNT.value: (1, 10),
         StrategyParameter.RESOURCE_WEIGHT.value: (0.0, 1.0),
         StrategyParameter.PRIORITY_BOOST.value: (0.0, 2.0),
+        StrategyParameter.CODE_GEN_SPEED_FACTOR.value: (0.1, 3.0),
+        StrategyParameter.CODE_GEN_FORCE_FACTOR.value: (0.5, 3.0),
     }
 
     # Default strategy values
@@ -93,6 +101,8 @@ class FeedbackLoop:
         StrategyParameter.RETRY_COUNT.value: 3.0,
         StrategyParameter.RESOURCE_WEIGHT.value: 0.5,
         StrategyParameter.PRIORITY_BOOST.value: 0.0,
+        StrategyParameter.CODE_GEN_SPEED_FACTOR.value: 1.0,
+        StrategyParameter.CODE_GEN_FORCE_FACTOR.value: 1.0,
     }
 
     # ------------------------------------------------------------------
@@ -168,7 +178,9 @@ class FeedbackLoop:
         )
         return data
 
-    def analyze_feedback(self, feedback: Optional[List[FeedbackData]] = None) -> AnalysisResult:
+    def analyze_feedback(
+        self, feedback: Optional[List[FeedbackData]] = None
+    ) -> AnalysisResult:
         """
         Analyse collected feedback and produce an ``AnalysisResult``.
 
@@ -191,12 +203,16 @@ class FeedbackLoop:
             )
 
         # --- Performance score ---
-        success_count = sum(1 for f in feedback if f.status in ("success", "completed", "done"))
+        success_count = sum(
+            1 for f in feedback if f.status in ("success", "completed", "done")
+        )
         success_rate = success_count / len(feedback)
 
         durations = [f.duration for f in feedback if f.duration > 0]
         avg_duration = statistics.mean(durations) if durations else 0.0
-        duration_variance = statistics.pvariance(durations) if len(durations) > 1 else 0.0
+        duration_variance = (
+            statistics.pvariance(durations) if len(durations) > 1 else 0.0
+        )
 
         # Penalise high variance (jitter is bad for scheduling)
         variance_penalty = min(duration_variance / (avg_duration + 1e-6), 1.0) * 0.2
@@ -207,7 +223,9 @@ class FeedbackLoop:
         bottlenecks: List[str] = []
 
         # Identify arms with low success rates
-        arm_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "success": 0})
+        arm_stats: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: {"total": 0, "success": 0}
+        )
         for f in feedback:
             arm_stats[f.arm_id]["total"] += 1
             if f.status in ("success", "completed", "done"):
@@ -215,9 +233,7 @@ class FeedbackLoop:
         for arm_id, stats in arm_stats.items():
             rate = stats["success"] / stats["total"] if stats["total"] > 0 else 0.0
             if rate < 0.7:
-                bottlenecks.append(
-                    f"Arm {arm_id} has low success rate ({rate:.0%})"
-                )
+                bottlenecks.append(f"Arm {arm_id} has low success rate ({rate:.0%})")
 
         # Identify tasks with excessive duration
         if durations:
@@ -242,7 +258,9 @@ class FeedbackLoop:
         recommendations: List[str] = []
 
         if success_rate < 0.9:
-            recommendations.append("Consider increasing retry_count to improve success rate")
+            recommendations.append(
+                "Consider increasing retry_count to improve success rate"
+            )
 
         if duration_variance > avg_duration * 0.5 and avg_duration > 0:
             recommendations.append(
@@ -270,7 +288,9 @@ class FeedbackLoop:
             recommendations=recommendations,
         )
 
-    def adjust_strategy(self, analysis: Optional[AnalysisResult] = None) -> List[StrategyAdjustment]:
+    def adjust_strategy(
+        self, analysis: Optional[AnalysisResult] = None
+    ) -> List[StrategyAdjustment]:
         """
         Propose strategy adjustments based on the latest analysis.
 
@@ -366,12 +386,62 @@ class FeedbackLoop:
                 adjustments.append(adj)
                 self._strategy[adj.parameter] = new_val
 
+        # --- Adjust code generation parameters on failures ---
+        failure_count = sum(
+            1
+            for fb in self._feedback_buffer
+            if fb.status not in ("success", "completed", "done")
+        )
+        total_count = len(self._feedback_buffer)
+        if total_count > 0 and failure_count / total_count > 0.2:
+            # Slow down movements to reduce execution errors
+            old_speed = self._strategy[
+                StrategyParameter.CODE_GEN_SPEED_FACTOR.value
+            ]
+            new_speed = self._clamp(
+                StrategyParameter.CODE_GEN_SPEED_FACTOR.value,
+                old_speed * 0.8,
+            )
+            if abs(new_speed - old_speed) > self.adjustment_threshold:
+                adj = StrategyAdjustment(
+                    target_module="code_generator",
+                    parameter=StrategyParameter.CODE_GEN_SPEED_FACTOR.value,
+                    old_value=old_speed,
+                    new_value=new_speed,
+                    reason=(
+                        f"High failure rate ({failure_count}/{total_count}); "
+                        f"slowing generated code movements"
+                    ),
+                )
+                adjustments.append(adj)
+                self._strategy[adj.parameter] = new_speed
+
+            # Increase grip force to improve pick reliability
+            old_force = self._strategy[
+                StrategyParameter.CODE_GEN_FORCE_FACTOR.value
+            ]
+            new_force = self._clamp(
+                StrategyParameter.CODE_GEN_FORCE_FACTOR.value,
+                old_force * 1.15,
+            )
+            if abs(new_force - old_force) > self.adjustment_threshold:
+                adj = StrategyAdjustment(
+                    target_module="code_generator",
+                    parameter=StrategyParameter.CODE_GEN_FORCE_FACTOR.value,
+                    old_value=old_force,
+                    new_value=new_force,
+                    reason=(
+                        f"High failure rate ({failure_count}/{total_count}); "
+                        f"increasing grip force in generated code"
+                    ),
+                )
+                adjustments.append(adj)
+                self._strategy[adj.parameter] = new_force
+
         self._adjustment_history.extend(adjustments)
 
         if adjustments:
-            logger.info(
-                "Strategy adjusted: %d change(s)", len(adjustments)
-            )
+            logger.info("Strategy adjusted: %d change(s)", len(adjustments))
         else:
             logger.debug("No strategy adjustments needed")
 

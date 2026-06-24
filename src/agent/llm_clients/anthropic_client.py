@@ -4,9 +4,10 @@ Anthropic LLM Client Implementation
 This module implements the Anthropic API client for Claude models.
 """
 
-import os
 import logging
-from typing import Dict, List, Optional, Any
+import os
+from typing import Any, Dict, List, Optional
+
 from anthropic import AsyncAnthropic
 
 from .base import BaseLLMClient, LLMMessage, LLMResponse, MessageRole
@@ -23,12 +24,12 @@ class AnthropicClient(BaseLLMClient):
 
     # Pricing per 1K tokens (as of 2024)
     PRICING = {
-        'claude-3-opus-20240229': {'input': 0.015, 'output': 0.075},
-        'claude-3-sonnet-20240229': {'input': 0.003, 'output': 0.015},
-        'claude-3-haiku-20240307': {'input': 0.00025, 'output': 0.00125},
-        'claude-2.1': {'input': 0.008, 'output': 0.024},
-        'claude-2.0': {'input': 0.008, 'output': 0.024},
-        'claude-instant-1.2': {'input': 0.0008, 'output': 0.0024},
+        "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
+        "claude-3-sonnet-20240229": {"input": 0.003, "output": 0.015},
+        "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
+        "claude-2.1": {"input": 0.008, "output": 0.024},
+        "claude-2.0": {"input": 0.008, "output": 0.024},
+        "claude-instant-1.2": {"input": 0.0008, "output": 0.0024},
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -46,27 +47,23 @@ class AnthropicClient(BaseLLMClient):
         super().__init__(config)
 
         # Get API key from config or environment
-        api_key = config.get('api_key') or os.environ.get('ANTHROPIC_API_KEY')
+        api_key = config.get("api_key") or os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError(
                 "Anthropic API key must be provided in config or ANTHROPIC_API_KEY environment variable"
             )
 
         # Initialize client
-        base_url = config.get('base_url')
-        self.client = AsyncAnthropic(
-            api_key=api_key,
-            base_url=base_url
-        )
+        base_url = config.get("base_url")
+        self.client = AsyncAnthropic(api_key=api_key, base_url=base_url)
 
         # Set model
-        self.model = config.get('model', 'claude-3-sonnet-20240229')
+        self.model = config.get("model", "claude-3-sonnet-20240229")
 
         logger.info(f"Anthropic client initialized with model: {self.model}")
 
     def _convert_messages(
-        self,
-        messages: List[LLMMessage]
+        self, messages: List[LLMMessage]
     ) -> tuple[Optional[str], List[Dict[str, str]]]:
         """
         Convert messages to Anthropic format.
@@ -88,18 +85,16 @@ class AnthropicClient(BaseLLMClient):
             if msg.role == MessageRole.SYSTEM:
                 system_prompt = msg.content
             else:
-                converted_messages.append({
-                    'role': msg.role.value,
-                    'content': msg.content
-                })
+                converted_messages.append(
+                    {"role": msg.role.value, "content": msg.content}
+                )
 
         # Ensure messages alternate correctly
         # Anthropic requires messages to start with user
-        if converted_messages and converted_messages[0]['role'] != 'user':
-            converted_messages.insert(0, {
-                'role': 'user',
-                'content': 'Please proceed with the task.'
-            })
+        if converted_messages and converted_messages[0]["role"] != "user":
+            converted_messages.insert(
+                0, {"role": "user", "content": "Please proceed with the task."}
+            )
 
         return system_prompt, converted_messages
 
@@ -108,7 +103,7 @@ class AnthropicClient(BaseLLMClient):
         messages: List[LLMMessage],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Send a chat request to Anthropic.
@@ -134,23 +129,23 @@ class AnthropicClient(BaseLLMClient):
 
         # Prepare parameters
         params = {
-            'model': self.model,
-            'messages': converted_messages,
-            'temperature': temperature or self.temperature,
-            'max_tokens': max_tokens or self.max_tokens,
+            "model": self.model,
+            "messages": converted_messages,
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
         }
 
         # Add system prompt if present
         if system_prompt:
-            params['system'] = system_prompt
+            params["system"] = system_prompt
 
         # Add optional parameters
-        if 'top_p' in kwargs:
-            params['top_p'] = kwargs['top_p']
-        if 'top_k' in kwargs:
-            params['top_k'] = kwargs['top_k']
-        if 'stop_sequences' in kwargs:
-            params['stop_sequences'] = kwargs['stop_sequences']
+        if "top_p" in kwargs:
+            params["top_p"] = kwargs["top_p"]
+        if "top_k" in kwargs:
+            params["top_k"] = kwargs["top_k"]
+        if "stop_sequences" in kwargs:
+            params["stop_sequences"] = kwargs["stop_sequences"]
 
         try:
             logger.debug(f"Sending chat request with {len(messages)} messages")
@@ -160,9 +155,10 @@ class AnthropicClient(BaseLLMClient):
 
             # Extract response
             usage = {
-                'prompt_tokens': response.usage.input_tokens,
-                'completion_tokens': response.usage.output_tokens,
-                'total_tokens': response.usage.input_tokens + response.usage.output_tokens,
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens
+                + response.usage.output_tokens,
             }
 
             # Calculate cost
@@ -175,7 +171,7 @@ class AnthropicClient(BaseLLMClient):
                 model=response.model,
                 usage=usage,
                 finish_reason=response.stop_reason,
-                metadata={'cost': cost}
+                metadata={"cost": cost},
             )
 
             # Update usage statistics
@@ -197,7 +193,7 @@ class AnthropicClient(BaseLLMClient):
         prompt: str,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Send a completion request to Anthropic.
@@ -228,12 +224,11 @@ class AnthropicClient(BaseLLMClient):
             Cost in USD.
         """
         pricing = self.PRICING.get(
-            self.model,
-            self.PRICING.get('claude-3-sonnet-20240229')
+            self.model, self.PRICING.get("claude-3-sonnet-20240229")
         )
 
-        input_cost = (usage['prompt_tokens'] / 1000) * pricing['input']
-        output_cost = (usage['completion_tokens'] / 1000) * pricing['output']
+        input_cost = (usage["prompt_tokens"] / 1000) * pricing["input"]
+        output_cost = (usage["completion_tokens"] / 1000) * pricing["output"]
 
         return input_cost + output_cost
 
@@ -245,12 +240,12 @@ class AnthropicClient(BaseLLMClient):
             Dictionary containing model information.
         """
         return {
-            'provider': 'anthropic',
-            'model': self.model,
-            'max_tokens': self.max_tokens,
-            'temperature': self.temperature,
-            'total_cost': self._total_cost,
-            'total_tokens': self._total_tokens,
+            "provider": "anthropic",
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "total_cost": self._total_cost,
+            "total_tokens": self._total_tokens,
         }
 
     async def stream_chat(
@@ -258,7 +253,7 @@ class AnthropicClient(BaseLLMClient):
         messages: List[LLMMessage],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Stream a chat response from Anthropic.
@@ -281,15 +276,15 @@ class AnthropicClient(BaseLLMClient):
 
         # Prepare parameters
         params = {
-            'model': self.model,
-            'messages': converted_messages,
-            'temperature': temperature or self.temperature,
-            'max_tokens': max_tokens or self.max_tokens,
+            "model": self.model,
+            "messages": converted_messages,
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
         }
 
         # Add system prompt if present
         if system_prompt:
-            params['system'] = system_prompt
+            params["system"] = system_prompt
 
         try:
             logger.debug(f"Starting stream chat with {len(messages)} messages")

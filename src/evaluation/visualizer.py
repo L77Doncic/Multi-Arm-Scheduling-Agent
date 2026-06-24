@@ -14,10 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 import matplotlib
+
 matplotlib.use("Agg")  # non-interactive backend; safe for headless servers
 
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 from evaluation.metrics import EvaluationMetrics, ExecutionLog, TaskEntry
@@ -26,8 +27,14 @@ logger = logging.getLogger(__name__)
 
 # Colour palette for arms (cycles if >8 arms)
 _ARM_COLORS = [
-    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
-    "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
 ]
 
 
@@ -71,7 +78,9 @@ class Visualizer:
             arms.setdefault(entry.arm_id, []).append(entry)
 
         arm_ids = sorted(arms.keys())
-        fig, ax = plt.subplots(figsize=(max(10, len(execution_log) * 0.4), max(4, len(arm_ids) * 0.8)))
+        fig, ax = plt.subplots(
+            figsize=(max(10, len(execution_log) * 0.4), max(4, len(arm_ids) * 0.8))
+        )
         self.fig = fig
 
         color_map: Dict[str, str] = {}
@@ -209,8 +218,22 @@ class Visualizer:
         fig, ax = plt.subplots(figsize=(10, 5))
         self.fig = fig
 
-        bars1 = ax.bar([i - width / 2 for i in x], baseline_vals, width, label=baseline_label, color="#ff7f0e", alpha=0.85)
-        bars2 = ax.bar([i + width / 2 for i in x], agent_vals, width, label=agent_label, color="#1f77b4", alpha=0.85)
+        bars1 = ax.bar(
+            [i - width / 2 for i in x],
+            baseline_vals,
+            width,
+            label=baseline_label,
+            color="#ff7f0e",
+            alpha=0.85,
+        )
+        bars2 = ax.bar(
+            [i + width / 2 for i in x],
+            agent_vals,
+            width,
+            label=agent_label,
+            color="#1f77b4",
+            alpha=0.85,
+        )
 
         ax.set_xticks(x)
         ax.set_xticklabels(display_names)
@@ -359,10 +382,25 @@ class Visualizer:
             for entry in entries:
                 dur = entry.end_time - entry.start_time
                 alpha = 1.0 if entry.status == "completed" else 0.4
-                ax.barh(y_pos, dur, left=entry.start_time, height=0.6,
-                        color=color, alpha=alpha, edgecolor="white", linewidth=0.5)
-                ax.text(entry.start_time + dur / 2, y_pos, entry.task_id,
-                        ha="center", va="center", fontsize=7, color="white")
+                ax.barh(
+                    y_pos,
+                    dur,
+                    left=entry.start_time,
+                    height=0.6,
+                    color=color,
+                    alpha=alpha,
+                    edgecolor="white",
+                    linewidth=0.5,
+                )
+                ax.text(
+                    entry.start_time + dur / 2,
+                    y_pos,
+                    entry.task_id,
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="white",
+                )
 
         ax.set_yticks(range(len(arm_ids)))
         ax.set_yticklabels(arm_ids)
@@ -404,14 +442,38 @@ class Visualizer:
         self, agent: EvaluationMetrics, baseline: EvaluationMetrics
     ) -> Figure:
         names = ["Makespan", "Success Rate", "Resource Util.", "Violations"]
-        agent_vals = [agent.makespan, agent.task_success_rate, agent.resource_utilization, float(agent.constraint_violations)]
-        base_vals = [baseline.makespan, baseline.task_success_rate, baseline.resource_utilization, float(baseline.constraint_violations)]
+        agent_vals = [
+            agent.makespan,
+            agent.task_success_rate,
+            agent.resource_utilization,
+            float(agent.constraint_violations),
+        ]
+        base_vals = [
+            baseline.makespan,
+            baseline.task_success_rate,
+            baseline.resource_utilization,
+            float(baseline.constraint_violations),
+        ]
 
         x = list(range(len(names)))
         width = 0.35
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar([i - width / 2 for i in x], base_vals, width, label="Baseline", color="#ff7f0e", alpha=0.85)
-        ax.bar([i + width / 2 for i in x], agent_vals, width, label="Agent", color="#1f77b4", alpha=0.85)
+        ax.bar(
+            [i - width / 2 for i in x],
+            base_vals,
+            width,
+            label="Baseline",
+            color="#ff7f0e",
+            alpha=0.85,
+        )
+        ax.bar(
+            [i + width / 2 for i in x],
+            agent_vals,
+            width,
+            label="Agent",
+            color="#1f77b4",
+            alpha=0.85,
+        )
         ax.set_xticks(x)
         ax.set_xticklabels(names)
         ax.set_ylabel("Value")

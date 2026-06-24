@@ -41,9 +41,13 @@ def setup_logging(verbose: bool = False):
 
 
 def load_scenario(scenario_path: str) -> dict:
-    """Load scenario configuration from YAML file."""
+    """Load scenario configuration from YAML or JSON file."""
     with open(scenario_path, 'r') as f:
-        config = yaml.safe_load(f)
+        if scenario_path.endswith('.json'):
+            import json
+            config = json.load(f)
+        else:
+            config = yaml.safe_load(f)
     return config
 
 
@@ -57,53 +61,104 @@ def load_agent_config(config_path: str = "configs/agent_config.yaml") -> dict:
 
 
 def create_simulation(sim_type: str, scene_config: dict):
-    """Create simulation interface."""
+    """Create simulation interface. Isaac Sim is the default; mock only if explicitly requested."""
+    if sim_type == "mock":
+        from simulation.mock_simulator import MockSimulator
+
+        sim = MockSimulator(
+            failure_probabilities={},
+            time_scale=1.0,
+            seed=42,
+        )
+        sim.initialize()
+        sim.load_scene(scene_config)
+        logging.info("Using mock simulator (no real physics)")
+        return sim
+
     if sim_type == "isaac":
-        try:
-            from simulation.isaac_sim import IsaacSimInterface
-            sim = IsaacSimInterface(fallback_to_mock=True)
-            sim.initialize()
-            sim.load_scene(scene_config)
-            return sim
-        except ImportError:
-            logging.warning("Isaac Sim not available, falling back to mock")
+        from simulation.isaac_sim import IsaacSimInterface
+
+        sim = IsaacSimInterface(fallback_to_mock=False)
+        sim.initialize()
+        sim.load_scene(scene_config)
+        return sim
 
     elif sim_type == "omniverse":
-        try:
-            from simulation.omniverse import OmniverseInterface
-            sim = OmniverseInterface(fallback_to_mock=True)
-            sim.initialize()
-            sim.load_scene(scene_config)
-            return sim
-        except ImportError:
-            logging.warning("Omniverse not available, falling back to mock")
+        from simulation.omniverse import OmniverseInterface
+
+        sim = OmniverseInterface(fallback_to_mock=False)
+        sim.initialize()
+        sim.load_scene(scene_config)
+        return sim
 
     elif sim_type == "isaac_lab":
-        try:
-            from simulation.isaac_lab import IsaacLabInterface
-            sim = IsaacLabInterface(fallback_to_mock=True)
-            sim.initialize()
-            sim.load_scene(scene_config)
-            return sim
-        except ImportError:
-            logging.warning("Isaac Lab not available, falling back to mock")
+        from simulation.isaac_lab import IsaacLabInterface
 
-    from simulation.mock_simulator import MockSimulator
+        sim = IsaacLabInterface(fallback_to_mock=False)
+        sim.initialize()
+        sim.load_scene(scene_config)
+        return sim
 
-    # Create mock simulator
-    sim = MockSimulator(
-        failure_probabilities={},  # No failures by default
-        time_scale=1.0,  # Real time scale (1.0 = normal speed)
-        seed=42,
-    )
-    sim.initialize()
-    sim.load_scene(scene_config)
-
-    return sim
+    raise ValueError(f"Unknown simulation type: {sim_type}")
 
 
-def run_simulation(scenario_path: str, sim_type: str = "mock",
-                   verbose: bool = False, output_dir: str = "outputs/results"):
+def save_video(frames, output_path):
+    """Save frames as H.264 MP4 video."""
+    import subprocess
+    import tempfile
+
+    try:
+        import cv2
+        import numpy as np
+
+        h, w = frames[0].shape[:2]
+
+        # Save raw frames as temporary video (MPEG-4 Part 2)
+        tmp_path = output_path + ".tmp.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(tmp_path, fourcc, 30.0, (w, h))
+        for frame in frames:
+            if len(frame.shape) == 3 and frame.shape[2] == 4:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+            elif len(frame.shape) == 3 and frame.shape[2] == 3:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            out.write(frame)
+        out.release()
+
+        # Transcode to H.264 via ffmpeg
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", tmp_path,
+             "-c:v", "libx264", "-preset", "medium",
+             "-crf", "18", "-pix_fmt", "yuv420p",
+             output_path],
+            capture_output=True, timeout=60,
+        )
+
+        if result.returncode == 0:
+            # Clean up temp file on success
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            return True
+        else:
+            logging.warning("ffmpeg transcoding failed: %s", result.stderr.decode()[:200])
+            # Fall back to the raw file
+            import shutil
+            shutil.move(tmp_path, output_path)
+            return True
+
+    except FileNotFoundError:
+        logging.warning("ffmpeg not found, saving as MPEG-4 Part 2")
+        return False
+    except Exception as e:
+        logging.warning("Failed to save video: %s", e)
+        return False
+
+
+def run_simulation(scenario_path: str, sim_type: str = "isaac",
+                   verbose: bool = False, output_dir: str = "outputs/results",
+                   save_video_flag: bool = False):
     """Run the full simulation pipeline."""
     setup_logging(verbose)
     logger = logging.getLogger("run_simulation")
@@ -144,6 +199,7 @@ def run_simulation(scenario_path: str, sim_type: str = "mock",
     print("\n" + "=" * 70)
     print("SIMULATION RESULTS")
     print("=" * 70)
+    print(f"Backend:         {sim_type}")
     print(f"Execution ID:    {result.execution_id}")
     print(f"Instruction:     {instruction[:80]}...")
     print(f"Tasks:           {len(result.tasks)}")
@@ -153,6 +209,8 @@ def run_simulation(scenario_path: str, sim_type: str = "mock",
     print(f"Violations:      {result.constraint_violations}")
     print(f"Wall Clock:      {elapsed:.2f}s")
     print(f"Feedback Adj:    {len(result.feedback_adjustments)}")
+    if hasattr(sim, 'frame_count'):
+        print(f"Frames Captured: {sim.frame_count}")
     print()
 
     # Task details
@@ -177,6 +235,7 @@ def run_simulation(scenario_path: str, sim_type: str = "mock",
     output_file = os.path.join(output_dir, f"simulation_{result.execution_id}.json")
 
     output_data = {
+        'backend': sim_type,
         'execution_id': result.execution_id,
         'instruction': instruction,
         'scenario': scenario_path,
@@ -197,6 +256,20 @@ def run_simulation(scenario_path: str, sim_type: str = "mock",
     with open(output_file, 'w') as f:
         json.dump(output_data, f, indent=2, default=str)
     logger.info("Results saved to %s", output_file)
+
+    # Save video if requested and frames are available
+    if save_video_flag and hasattr(sim, 'get_frames'):
+        frames = sim.get_frames()
+        if frames:
+            scenario_name = Path(scenario_path).stem
+            video_file = os.path.join(output_dir, f"simulation_{scenario_name}.mp4")
+            if save_video(frames, video_file):
+                print(f"Video saved: {video_file} ({len(frames)} frames)")
+            output_data['video_file'] = video_file
+            output_data['frames_captured'] = len(frames)
+            # Re-save with video info
+            with open(output_file, 'w') as f:
+                json.dump(output_data, f, indent=2, default=str)
 
     # Save generated codes
     if result.generated_codes:
@@ -225,9 +298,9 @@ def main():
     )
     parser.add_argument(
         "--sim",
-        default="mock",
-        choices=["mock", "isaac", "omniverse", "isaac_lab"],
-        help="Simulation backend (default: mock)"
+        default="isaac",
+        choices=["isaac", "mock", "omniverse", "isaac_lab"],
+        help="Simulation backend (default: isaac — real physics)"
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -239,9 +312,46 @@ def main():
         default="outputs/results",
         help="Output directory (default: outputs/results)"
     )
+    parser.add_argument(
+        "--video",
+        action="store_true",
+        help="Save simulation video (Isaac Sim only, captured during execution)"
+    )
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        default=1,
+        help="Number of runs with different seeds (default: 1)"
+    )
 
     args = parser.parse_args()
-    run_simulation(args.scenario, args.sim, args.verbose, args.output)
+
+    if args.seeds > 1:
+        # Multi-seed evaluation
+        import numpy as np
+        all_results = []
+        for seed in range(42, 42 + args.seeds):
+            import random
+            random.seed(seed)
+            np.random.seed(seed)
+            print(f"\n{'='*70}")
+            print(f"RUN seed={seed}")
+            print(f"{'='*70}")
+            result = run_simulation(args.scenario, args.sim, args.verbose,
+                                    args.output, args.video)
+            all_results.append(result)
+
+        # Summary
+        print(f"\n{'='*70}")
+        print(f"MULTI-SEED SUMMARY ({args.seeds} runs)")
+        print(f"{'='*70}")
+        makespans = [r.makespan for r in all_results]
+        successes = [r.task_success_rate for r in all_results]
+        print(f"Makespan:    {np.mean(makespans):.2f} ± {np.std(makespans):.2f}s")
+        print(f"Success Rate: {np.mean(successes)*100:.1f}%")
+    else:
+        run_simulation(args.scenario, args.sim, args.verbose,
+                       args.output, args.video)
 
 
 if __name__ == "__main__":

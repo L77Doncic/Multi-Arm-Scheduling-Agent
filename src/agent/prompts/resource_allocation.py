@@ -147,7 +147,7 @@ Please suggest optimizations to improve the schedule performance.
         tasks: str,
         robot_arms: str,
         current_state: str,
-        objective: str = "minimize_makespan"
+        objective: str = "minimize_makespan",
     ) -> str:
         """
         Get the resource allocation prompt.
@@ -165,15 +165,12 @@ Please suggest optimizations to improve the schedule performance.
             tasks=tasks,
             robot_arms=robot_arms,
             current_state=current_state,
-            objective=objective
+            objective=objective,
         )
 
     @classmethod
     def get_conflict_resolution_prompt(
-        cls,
-        conflict: str,
-        current_allocations: str,
-        options: str
+        cls, conflict: str, current_allocations: str, options: str
     ) -> str:
         """
         Get the conflict resolution prompt.
@@ -187,17 +184,12 @@ Please suggest optimizations to improve the schedule performance.
             Formatted prompt string.
         """
         return cls.RESOLVE_CONFLICT.format(
-            conflict=conflict,
-            current_allocations=current_allocations,
-            options=options
+            conflict=conflict, current_allocations=current_allocations, options=options
         )
 
     @classmethod
     def get_optimization_prompt(
-        cls,
-        current_schedule: str,
-        metrics: str,
-        goals: str
+        cls, current_schedule: str, metrics: str, goals: str
     ) -> str:
         """
         Get the schedule optimization prompt.
@@ -211,7 +203,5 @@ Please suggest optimizations to improve the schedule performance.
             Formatted prompt string.
         """
         return cls.OPTIMIZE_SCHEDULE.format(
-            current_schedule=current_schedule,
-            metrics=metrics,
-            goals=goals
+            current_schedule=current_schedule, metrics=metrics, goals=goals
         )

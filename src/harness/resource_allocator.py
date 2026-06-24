@@ -17,15 +17,17 @@ logger = logging.getLogger(__name__)
 
 class ConflictType(Enum):
     """Types of resource conflicts."""
-    TEMPORAL = "temporal"        # Two tasks scheduled at the same time on one arm
-    CAPABILITY = "capability"   # Arm lacks required capability
-    RESOURCE = "resource"       # Shared resource contention (e.g. tool, workspace)
-    COLLISION = "collision"     # Physical collision risk between arms
+
+    TEMPORAL = "temporal"  # Two tasks scheduled at the same time on one arm
+    CAPABILITY = "capability"  # Arm lacks required capability
+    RESOURCE = "resource"  # Shared resource contention (e.g. tool, workspace)
+    COLLISION = "collision"  # Physical collision risk between arms
 
 
 @dataclass
 class Conflict:
     """Represents a resource allocation conflict."""
+
     task1_id: str
     task2_id: str
     arm_id: str
@@ -35,6 +37,7 @@ class Conflict:
 @dataclass
 class TaskInfo:
     """Simplified task representation used during allocation."""
+
     id: str
     required_capabilities: List[str]
     estimated_duration: float
@@ -45,6 +48,7 @@ class TaskInfo:
 @dataclass
 class ArmInfo:
     """Simplified robot arm representation used during allocation."""
+
     id: str
     capabilities: List[str]
     max_load: float = 1.0
@@ -131,15 +135,14 @@ class ResourceAllocator:
         Returns:
             Dictionary mapping ``task.id`` -> ``arm.id``.
         """
-        logger.info(
-            "Allocating %d tasks across %d arms", len(tasks), len(robot_arms)
-        )
+        logger.info("Allocating %d tasks across %d arms", len(tasks), len(robot_arms))
 
         task_infos = self._to_task_infos(tasks)
         arm_infos = self._to_arm_infos(robot_arms)
 
         # Greedy initial assignment
         assignment = self._greedy_assign(task_infos, arm_infos)
+        self._last_assignment = dict(assignment)  # Update before conflict resolution
 
         # Iteratively detect and resolve conflicts
         for iteration in range(self.max_iterations):
@@ -147,7 +150,9 @@ class ResourceAllocator:
             if not conflicts:
                 break
             logger.debug(
-                "Conflict resolution pass %d: %d conflicts", iteration + 1, len(conflicts)
+                "Conflict resolution pass %d: %d conflicts",
+                iteration + 1,
+                len(conflicts),
             )
             assignment = self.resolve_conflicts(conflicts, task_infos, arm_infos)
 
@@ -176,13 +181,22 @@ class ResourceAllocator:
         Returns:
             Updated assignment dictionary.
         """
-        task_infos = self._to_task_infos(tasks) if tasks and not isinstance(tasks[0], TaskInfo) else tasks
-        arm_infos = self._to_arm_infos(arms) if arms and not isinstance(arms[0], ArmInfo) else arms
+        task_infos = (
+            self._to_task_infos(tasks)
+            if tasks and not isinstance(tasks[0], TaskInfo)
+            else tasks
+        )
+        arm_infos = (
+            self._to_arm_infos(arms)
+            if arms and not isinstance(arms[0], ArmInfo)
+            else arms
+        )
 
         task_map: Dict[str, TaskInfo] = {t.id: t for t in task_infos}
         arm_map: Dict[str, ArmInfo] = {a.id: a for a in arm_infos}
 
         # Start from the current best assignment
+        # Use the passed-in assignment if available, fall back to _last_assignment
         assignment: Dict[str, str] = dict(self._last_assignment)
 
         for conflict in conflicts:
@@ -475,9 +489,7 @@ class ResourceAllocator:
             if arm is None:
                 continue
             total_duration = sum(
-                task_map[tid].estimated_duration
-                for tid in task_ids
-                if tid in task_map
+                task_map[tid].estimated_duration for tid in task_ids if tid in task_map
             )
             # If total duration exceeds the arm's effective capacity
             # (derived from max_load), flag pairs for rebalancing

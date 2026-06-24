@@ -10,11 +10,7 @@ the class silently delegates every call to :class:`MockSimulator`.
 import logging
 from typing import Any, Dict, Optional
 
-from simulation.base import (
-    ActionResult,
-    SimulationInterface,
-    SimulationState,
-)
+from simulation.base import ActionResult, SimulationInterface, SimulationState
 from simulation.mock_simulator import MockSimulator
 
 logger = logging.getLogger(__name__)
@@ -23,12 +19,14 @@ logger = logging.getLogger(__name__)
 try:
     import isaacsim  # type: ignore[import-untyped]  # Isaac Lab >= 1.0
     from isaacsim.core.api import World as IsaacLabWorld  # type: ignore[import-untyped]
+
     _ISAAC_LAB_AVAILABLE = True
 except ImportError:
     try:
         # Fallback: older Isaac Lab / Isaac Sim API
         import omni.isaac.lab  # type: ignore[import-untyped]
         from omni.isaac.lab.app import AppLauncher  # type: ignore[import-untyped]
+
         _ISAAC_LAB_AVAILABLE = True
     except ImportError:
         _ISAAC_LAB_AVAILABLE = False
@@ -77,9 +75,7 @@ class IsaacLabInterface(SimulationInterface):
             kwargs = mock_kwargs or {}
             self._mock = MockSimulator(**kwargs)
             self._use_mock = True
-            logger.warning(
-                "Isaac Lab not installed -- falling back to MockSimulator"
-            )
+            logger.warning("Isaac Lab not installed -- falling back to MockSimulator")
         else:
             raise ImportError(
                 "isaacsim (Isaac Lab) is required but not installed. "
@@ -91,8 +87,11 @@ class IsaacLabInterface(SimulationInterface):
             self._mock.initialize()
             return
 
-        logger.info("Initializing Isaac Lab world (headless=%s, device=%s)",
-                     self._headless, self._device)
+        logger.info(
+            "Initializing Isaac Lab world (headless=%s, device=%s)",
+            self._headless,
+            self._device,
+        )
 
         # Launch the simulation app if needed
         if "omni.isaac.lab" in dir():
@@ -118,7 +117,9 @@ class IsaacLabInterface(SimulationInterface):
             logger.debug(
                 "Spawning robot '%s' at (%s, %s, %s)",
                 arm_cfg["id"],
-                pos.get("x", 0), pos.get("y", 0), pos.get("z", 0),
+                pos.get("x", 0),
+                pos.get("y", 0),
+                pos.get("z", 0),
             )
 
         # Load objects
@@ -135,6 +136,7 @@ class IsaacLabInterface(SimulationInterface):
 
         self._ensure_world()
         import time
+
         start = time.monotonic()
         action_type = action.get("type", "unknown")
 

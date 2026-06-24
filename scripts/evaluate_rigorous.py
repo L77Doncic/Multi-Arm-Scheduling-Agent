@@ -43,6 +43,9 @@ def setup_logging(verbose: bool = False):
 
 def load_scenario(path: str) -> dict:
     with open(path) as f:
+        if path.endswith('.json'):
+            import json
+            return json.load(f)
         return yaml.safe_load(f)
 
 

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class ExceptionType(Enum):
     """Categories of exceptions the system can handle."""
+
     TIMEOUT = "timeout"
     RESOURCE_CONFLICT = "resource_conflict"
     COLLISION = "collision"
@@ -34,6 +35,7 @@ class ExceptionType(Enum):
 
 class RecoveryActionType(Enum):
     """High-level recovery strategies."""
+
     RETRY = "retry"
     SKIP = "skip"
     FALLBACK = "fallback"
@@ -43,6 +45,7 @@ class RecoveryActionType(Enum):
 @dataclass
 class RecoveryAction:
     """Describes a recommended recovery action."""
+
     action_type: RecoveryActionType
     parameters: Dict[str, Any] = field(default_factory=dict)
     priority: int = 0  # higher = more urgent
@@ -51,6 +54,7 @@ class RecoveryAction:
 @dataclass
 class ExceptionRecord:
     """Historical record of a handled exception."""
+
     timestamp: float
     exception_type: ExceptionType
     message: str
@@ -159,7 +163,9 @@ class ExceptionHandler:
                 )
         logger.info("ExceptionHandler config updated: %s", params)
 
-    def handle(self, exception: BaseException, context: Dict[str, Any]) -> RecoveryAction:
+    def handle(
+        self, exception: BaseException, context: Dict[str, Any]
+    ) -> RecoveryAction:
         """
         Classify an exception and determine a recovery action.
 
@@ -248,9 +254,7 @@ class ExceptionHandler:
             Dictionary with counts per type, success rates, etc.
         """
         total = len(self._history)
-        by_type: Dict[str, int] = {
-            k.value: v for k, v in self._counts.items()
-        }
+        by_type: Dict[str, int] = {k.value: v for k, v in self._counts.items()}
         outcomes: Dict[str, int] = defaultdict(int)
         for rec in self._history:
             outcomes[rec.outcome] += 1
@@ -323,11 +327,7 @@ class ExceptionHandler:
             return ExceptionType.CONSTRAINT_VIOLATION
 
         # --- Simulation ---
-        if (
-            "simulation" in name
-            or "sim" in name
-            or "simulation" in msg
-        ):
+        if "simulation" in name or "sim" in name or "simulation" in msg:
             return ExceptionType.SIMULATION_ERROR
 
         # --- Code generation ---
@@ -363,9 +363,7 @@ class ExceptionHandler:
         key = f"{task_id}:{exception_type.value}"
         self._recent_attempts[key].append(time.time())
 
-        action_type = self._recovery_map.get(
-            exception_type, RecoveryActionType.RETRY
-        )
+        action_type = self._recovery_map.get(exception_type, RecoveryActionType.RETRY)
         priority = self._DEFAULT_PRIORITY.get(exception_type, 50)
 
         # If we have exceeded retry limits, escalate to REPLAN or SKIP

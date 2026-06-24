@@ -6,9 +6,9 @@ into executable subtasks for multi-arm scheduling.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DecomposedTask:
     """Represents a decomposed task with dependencies."""
+
     id: str
     name: str
     description: str
@@ -56,14 +57,14 @@ class TaskDecomposer:
         """
         # TODO: Load from configuration or database
         patterns = {
-            'pick': ['pick', 'grab', 'grasp', 'take', 'lift'],
-            'place': ['place', 'put', 'position', 'set', 'drop'],
-            'move': ['move', 'transfer', 'transport', 'carry'],
-            'assemble': ['assemble', 'connect', 'attach', 'join', 'fasten'],
-            'inspect': ['inspect', 'check', 'verify', 'examine', 'test'],
-            'tighten': ['tighten', 'secure', 'bolt', 'screw'],
-            'weld': ['weld', 'solder', 'bond', 'fuse'],
-            'paint': ['paint', 'coat', 'spray', 'finish'],
+            "pick": ["pick", "grab", "grasp", "take", "lift"],
+            "place": ["place", "put", "position", "set", "drop"],
+            "move": ["move", "transfer", "transport", "carry"],
+            "assemble": ["assemble", "connect", "attach", "join", "fasten"],
+            "inspect": ["inspect", "check", "verify", "examine", "test"],
+            "tighten": ["tighten", "secure", "bolt", "screw"],
+            "weld": ["weld", "solder", "bond", "fuse"],
+            "paint": ["paint", "coat", "spray", "finish"],
         }
         return patterns
 
@@ -112,11 +113,11 @@ class TaskDecomposer:
         # - Constraints and requirements
 
         parsed = {
-            'raw': instruction,
-            'objective': '',
-            'objects': [],
-            'operations': [],
-            'constraints': []
+            "raw": instruction,
+            "objective": "",
+            "objects": [],
+            "operations": [],
+            "constraints": [],
         }
 
         # Simple pattern matching for demonstration
@@ -125,9 +126,10 @@ class TaskDecomposer:
 
         # Extract objects (simple noun extraction)
         # TODO: Use NLP for better extraction
-        objects = re.findall(r'\b(?:arm|robot|gripper|part|component|workpiece)\b',
-                           instruction_lower)
-        parsed['objects'] = list(set(objects))
+        objects = re.findall(
+            r"\b(?:arm|robot|gripper|part|component|workpiece)\b", instruction_lower
+        )
+        parsed["objects"] = list(set(objects))
 
         return parsed
 
@@ -142,27 +144,31 @@ class TaskDecomposer:
             List of identified operations.
         """
         operations = []
-        instruction_lower = parsed['raw'].lower()
+        instruction_lower = parsed["raw"].lower()
 
         # Match operation patterns
         for op_type, patterns in self.operation_patterns.items():
             for pattern in patterns:
                 if pattern in instruction_lower:
-                    operations.append({
-                        'type': op_type,
-                        'pattern': pattern,
-                        'position': instruction_lower.find(pattern)
-                    })
+                    operations.append(
+                        {
+                            "type": op_type,
+                            "pattern": pattern,
+                            "position": instruction_lower.find(pattern),
+                        }
+                    )
 
         # Sort by position in instruction
-        operations.sort(key=lambda x: x['position'])
+        operations.sort(key=lambda x: x["position"])
 
         # Remove duplicates and overlapping operations
         operations = self._deduplicate_operations(operations)
 
         return operations
 
-    def _deduplicate_operations(self, operations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_operations(
+        self, operations: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Remove duplicate and overlapping operations.
 
@@ -180,13 +186,15 @@ class TaskDecomposer:
         deduplicated = []
 
         for op in operations:
-            if op['type'] not in seen_types:
+            if op["type"] not in seen_types:
                 deduplicated.append(op)
-                seen_types.add(op['type'])
+                seen_types.add(op["type"])
 
         return deduplicated
 
-    def _build_dependency_graph(self, operations: List[Dict[str, Any]]) -> Dict[int, List[int]]:
+    def _build_dependency_graph(
+        self, operations: List[Dict[str, Any]]
+    ) -> Dict[int, List[int]]:
         """
         Build dependency graph between operations.
 
@@ -213,8 +221,9 @@ class TaskDecomposer:
 
         return dependency_graph
 
-    def _create_tasks(self, operations: List[Dict[str, Any]],
-                     dependency_graph: Dict[int, List[int]]) -> List[DecomposedTask]:
+    def _create_tasks(
+        self, operations: List[Dict[str, Any]], dependency_graph: Dict[int, List[int]]
+    ) -> List[DecomposedTask]:
         """
         Create DecomposedTask objects from operations.
 
@@ -240,11 +249,11 @@ class TaskDecomposer:
                 id=task_id,
                 name=f"{op['type'].title()} Operation",
                 description=f"Execute {op['type']} operation",
-                operation_type=op['type'],
-                parameters={'pattern': op['pattern']},
+                operation_type=op["type"],
+                parameters={"pattern": op["pattern"]},
                 dependencies=dependencies,
-                estimated_duration=self._estimate_duration(op['type']),
-                required_capabilities=self._get_required_capabilities(op['type'])
+                estimated_duration=self._estimate_duration(op["type"]),
+                required_capabilities=self._get_required_capabilities(op["type"]),
             )
 
             tasks.append(task)
@@ -263,14 +272,14 @@ class TaskDecomposer:
         """
         # TODO: Use historical data or LLM for better estimation
         duration_estimates = {
-            'pick': 2.0,
-            'place': 2.0,
-            'move': 3.0,
-            'assemble': 5.0,
-            'inspect': 4.0,
-            'tighten': 3.0,
-            'weld': 6.0,
-            'paint': 5.0,
+            "pick": 2.0,
+            "place": 2.0,
+            "move": 3.0,
+            "assemble": 5.0,
+            "inspect": 4.0,
+            "tighten": 3.0,
+            "weld": 6.0,
+            "paint": 5.0,
         }
 
         return duration_estimates.get(operation_type, 3.0)
@@ -287,14 +296,14 @@ class TaskDecomposer:
         """
         # TODO: Load from configuration
         capability_map = {
-            'pick': ['gripper', 'positioning'],
-            'place': ['gripper', 'positioning'],
-            'move': ['locomotion', 'positioning'],
-            'assemble': ['gripper', 'positioning', 'force_control'],
-            'inspect': ['vision', 'positioning'],
-            'tighten': ['gripper', 'force_control', 'torque_control'],
-            'weld': ['welding_tool', 'positioning', 'force_control'],
-            'paint': ['painting_tool', 'positioning', 'spray_control'],
+            "pick": ["gripper", "positioning"],
+            "place": ["gripper", "positioning"],
+            "move": ["locomotion", "positioning"],
+            "assemble": ["gripper", "positioning", "force_control"],
+            "inspect": ["vision", "positioning"],
+            "tighten": ["gripper", "force_control", "torque_control"],
+            "weld": ["welding_tool", "positioning", "force_control"],
+            "paint": ["painting_tool", "positioning", "spray_control"],
         }
 
-        return capability_map.get(operation_type, ['general'])
+        return capability_map.get(operation_type, ["general"])

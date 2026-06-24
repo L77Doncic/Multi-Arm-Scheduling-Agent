@@ -22,9 +22,11 @@ def _make_id(prefix: str) -> str:
 # Data classes
 # ------------------------------------------------------------------
 
+
 @dataclass
 class Workstation:
     """A fixed workstation in the scene."""
+
     id: str
     position: Dict[str, float]
     capabilities: List[str] = field(default_factory=list)
@@ -34,6 +36,7 @@ class Workstation:
 @dataclass
 class Conveyor:
     """A conveyor belt connecting two points."""
+
     id: str
     start: Dict[str, float]
     end: Dict[str, float]
@@ -43,6 +46,7 @@ class Conveyor:
 @dataclass
 class Workpiece:
     """A workpiece / object that can be manipulated."""
+
     id: str
     type: str
     position: Dict[str, float] = field(default_factory=dict)
@@ -52,6 +56,7 @@ class Workpiece:
 @dataclass
 class RobotArm:
     """A robot arm placed in the scene."""
+
     id: str
     position: Dict[str, float] = field(default_factory=dict)
     capabilities: List[str] = field(default_factory=list)
@@ -60,6 +65,7 @@ class RobotArm:
 @dataclass
 class Bounds:
     """Axis-aligned bounding box for the scene."""
+
     x_min: float = -10.0
     x_max: float = 10.0
     y_min: float = -10.0
@@ -71,6 +77,7 @@ class Bounds:
 @dataclass
 class Scene:
     """A fully described simulation scene."""
+
     workstations: List[Workstation] = field(default_factory=list)
     conveyors: List[Conveyor] = field(default_factory=list)
     workpieces: List[Workpiece] = field(default_factory=list)
@@ -81,6 +88,7 @@ class Scene:
 # ------------------------------------------------------------------
 # SceneBuilder
 # ------------------------------------------------------------------
+
 
 class SceneBuilder:
     """

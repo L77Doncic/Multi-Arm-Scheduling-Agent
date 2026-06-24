@@ -54,9 +54,7 @@ class SyncLLMClient:
                 "OPENAI_API_KEY environment variable."
             )
         if not self.api_base:
-            raise ValueError(
-                "LLM API base URL is required. Set 'api_base' in config."
-            )
+            raise ValueError("LLM API base URL is required. Set 'api_base' in config.")
 
         self._client = OpenAI(
             api_key=self.api_key,
@@ -201,9 +199,7 @@ class SyncLLMClient:
         and responses with leading/trailing non-JSON text.
         """
         # Try to find a JSON code block
-        json_block_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL
-        )
+        json_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
         if json_block_match:
             text = json_block_match.group(1).strip()
 

@@ -49,10 +49,13 @@ class ArmInterface:
 
     def move_to(self, x: float, y: float, z: float, speed: float = 1.0) -> bool:
         """Move end-effector to absolute position."""
-        return self._execute("move", {
-            "position": {"x": x, "y": y, "z": z},
-            "speed": speed,
-        })
+        return self._execute(
+            "move",
+            {
+                "position": {"x": x, "y": y, "z": z},
+                "speed": speed,
+            },
+        )
 
     def linear_move(self, dx: float, dy: float, dz: float, speed: float = 1.0) -> bool:
         """Move relative to current position."""
@@ -64,30 +67,37 @@ class ArmInterface:
                 new_x = arm_state.position.x + dx
                 new_y = arm_state.position.y + dy
                 new_z = arm_state.position.z + dz
-                return self._execute("move", {
-                    "position": {"x": new_x, "y": new_y, "z": new_z},
-                    "speed": speed,
-                })
+                return self._execute(
+                    "move",
+                    {
+                        "position": {"x": new_x, "y": new_y, "z": new_z},
+                        "speed": speed,
+                    },
+                )
         except Exception:
             pass
         # Fallback: just execute a move action
         return self._execute("move", {"position": {"x": dx, "y": dy, "z": dz}})
 
-    def grip(self, force: float = 50.0) -> bool:
+    def grip(self, force: float = 50.0, target_id: str = "") -> bool:
         """Close gripper with specified force."""
-        return self._execute("pick", {"force": force})
+        return self._execute("pick", {"force": force, "target": target_id})
 
-    def release(self) -> bool:
-        """Open gripper to release object."""
-        return self._execute("place", {})
+    def release(self, target_id: str = "") -> bool:
+        """Open gripper to release object at current position."""
+        return self._execute("place", {"target": target_id, "position": {}})
 
-    def rotate(self, roll: float = 0, pitch: float = 0, yaw: float = 0,
-               speed: float = 1.0) -> bool:
+    def rotate(
+        self, roll: float = 0, pitch: float = 0, yaw: float = 0, speed: float = 1.0
+    ) -> bool:
         """Rotate end-effector to orientation."""
-        return self._execute("move", {
-            "position": {"roll": roll, "pitch": pitch, "yaw": yaw},
-            "speed": speed,
-        })
+        return self._execute(
+            "move",
+            {
+                "position": {"roll": roll, "pitch": pitch, "yaw": yaw},
+                "speed": speed,
+            },
+        )
 
     def wait(self, duration: float = 1.0) -> bool:
         """Wait for specified duration."""
@@ -128,8 +138,12 @@ class ArmInterface:
         self._action_count += 1
         return True
 
-    def set_compliance(self, stiffness_x: float = 200, stiffness_y: float = 200,
-                       stiffness_z: float = 100) -> bool:
+    def set_compliance(
+        self,
+        stiffness_x: float = 200,
+        stiffness_y: float = 200,
+        stiffness_z: float = 100,
+    ) -> bool:
         """Set Cartesian stiffness for contact tasks."""
         self._action_count += 1
         return True
@@ -168,7 +182,9 @@ class ArmInterface:
 
         action = {"type": action_type, **params}
         if self._estimated_duration > 0:
-            action["estimated_duration"] = self._estimated_duration / max(self._action_count, 1)
+            action["estimated_duration"] = self._estimated_duration / max(
+                self._action_count, 1
+            )
 
         try:
             result = self._sim.execute_action(self.arm_id, action)
@@ -178,12 +194,16 @@ class ArmInterface:
                 self._errors.append(result.error_message or f"{action_type} failed")
                 logger.debug(
                     "ArmInterface %s: %s failed: %s",
-                    self.arm_id, action_type, result.error_message,
+                    self.arm_id,
+                    action_type,
+                    result.error_message,
                 )
             return result.success
         except Exception as exc:
             self._errors.append(str(exc))
-            logger.warning("ArmInterface %s: %s exception: %s", self.arm_id, action_type, exc)
+            logger.warning(
+                "ArmInterface %s: %s exception: %s", self.arm_id, action_type, exc
+            )
             return False
 
 

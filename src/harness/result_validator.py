@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ConstraintType(Enum):
     """Constraint categories."""
+
     TEMPORAL = "temporal"
     SPATIAL = "spatial"
     RESOURCE = "resource"
@@ -28,6 +29,7 @@ class ConstraintType(Enum):
 
 class Severity(Enum):
     """Violation severity levels."""
+
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -37,6 +39,7 @@ class Severity(Enum):
 @dataclass
 class Constraint:
     """A single validation constraint."""
+
     type: ConstraintType
     parameters: Dict[str, Any]
     severity: Severity = Severity.ERROR
@@ -45,6 +48,7 @@ class Constraint:
 @dataclass
 class Violation:
     """Describes a single constraint violation."""
+
     constraint_type: ConstraintType
     message: str
     severity: Severity
@@ -54,6 +58,7 @@ class Violation:
 @dataclass
 class ValidationResult:
     """Aggregate result of a validation pass."""
+
     is_valid: bool
     violations: List[Violation]
     metrics: Dict[str, float]
@@ -75,8 +80,8 @@ class ResultValidator:
     """
 
     # Default thresholds (overridable via config)
-    DEFAULT_MAX_DURATION_FACTOR: float = 2.0   # allowed overshoot
-    DEFAULT_POSITION_TOLERANCE: float = 0.05   # metres
+    DEFAULT_MAX_DURATION_FACTOR: float = 2.0  # allowed overshoot
+    DEFAULT_POSITION_TOLERANCE: float = 0.05  # metres
     DEFAULT_RESOURCE_UTILISATION_CAP: float = 1.0  # 100 %
 
     def __init__(self, config: Dict[str, Any]):
@@ -179,7 +184,9 @@ class ResultValidator:
             summary=summary,
         )
 
-        logger.info("Validation complete: valid=%s, violations=%d", is_valid, len(violations))
+        logger.info(
+            "Validation complete: valid=%s, violations=%d", is_valid, len(violations)
+        )
         return result
 
     # ------------------------------------------------------------------
@@ -445,9 +452,7 @@ class ResultValidator:
         targets = params.get("target_positions", {})
         if targets:
             actual_positions = result.get("task_end_positions", {})
-            tolerance = params.get(
-                "position_tolerance", self.position_tolerance
-            )
+            tolerance = params.get("position_tolerance", self.position_tolerance)
             for task_id, expected in targets.items():
                 actual = actual_positions.get(task_id)
                 if actual is None:
@@ -478,9 +483,7 @@ class ResultValidator:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _euclidean_distance(
-        a: Tuple[float, ...], b: Tuple[float, ...]
-    ) -> float:
+    def _euclidean_distance(a: Tuple[float, ...], b: Tuple[float, ...]) -> float:
         """Compute Euclidean distance between two points."""
         return math.sqrt(sum((ai - bi) ** 2 for ai, bi in zip(a, b)))
 

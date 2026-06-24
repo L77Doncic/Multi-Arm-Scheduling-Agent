@@ -1,0 +1,56 @@
+{
+  "dataset": "MRTA-Benchmark (Sadcher/TU Delft)",
+  "source_url": "https://github.com/intelligent-control-lab/APEX-MR",
+  "n_scenarios": 6,
+  "unified_baseline": "MILP-optimal (PuLP/CBC solver)",
+  "scenarios": [
+    {
+      "name": "MRTA-1p-ProductionLine",
+      "instance": "problem_instance_1p_017145.json",
+      "optimal_makespan": 584.93921,
+      "n_tasks": 8,
+      "n_robots": 3
+    },
+    {
+      "name": "MRTA-2p-ProductionLine",
+      "instance": "problem_instance_2p_050465.json",
+      "optimal_makespan": 930.97607,
+      "n_tasks": 8,
+      "n_robots": 3
+    },
+    {
+      "name": "MRTA-3p-ProductionLine",
+      "instance": "problem_instance_3p_096969.json",
+      "optimal_makespan": 642.81723,
+      "n_tasks": 8,
+      "n_robots": 3
+    },
+    {
+      "name": "MRTA-4p-ProductionLine",
+      "instance": "problem_instance_4p_146259.json",
+      "optimal_makespan": 465.03634,
+      "n_tasks": 8,
+      "n_robots": 3
+    },
+    {
+      "name": "MRTA-5p-ProductionLine",
+      "instance": "problem_instance_5p_182974.json",
+      "optimal_makespan": 490.91589,
+      "n_tasks": 8,
+      "n_robots": 3
+    },
+    {
+      "name": "MRTA-6p-ProductionLine",
+      "instance": "problem_instance_6p_217821.json",
+      "optimal_makespan": 489.80231,
+      "n_tasks": 8,
+      "n_robots": 3
+    }
+  ],
+  "metrics": [
+    "makespan",
+    "task_success_rate",
+    "resource_utilization",
+    "constraint_violations"
+  ]
+}

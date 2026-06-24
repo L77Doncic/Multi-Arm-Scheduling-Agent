@@ -1,8 +1,8 @@
 # Simulation Configuration
 
 simulation:
-  # Backend: "mock" (software simulation) or "isaac" (NVIDIA Isaac Sim)
-  backend: "mock"
+  # Backend: "isaac" (NVIDIA Isaac Sim, real physics) or "mock" (software only, testing)
+  backend: "isaac"
 
   # Physics settings
   physics:

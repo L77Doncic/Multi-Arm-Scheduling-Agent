@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class TaskStatus(Enum):
     """Task status enumeration."""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -40,6 +41,7 @@ class TaskStatus(Enum):
 @dataclass
 class Task:
     """Task data class used throughout the system."""
+
     id: str
     name: str
     description: str
@@ -62,6 +64,7 @@ class Task:
 @dataclass
 class RobotArm:
     """Robot arm data class."""
+
     id: str
     name: str
     capabilities: List[str]
@@ -80,6 +83,7 @@ class RobotArm:
 @dataclass
 class ExecutionResult:
     """Complete result of a scheduling execution."""
+
     execution_id: str
     instruction: str
     tasks: List[Task]
@@ -205,6 +209,7 @@ class SchedulingAgent:
         # Load .env file if present
         try:
             from dotenv import load_dotenv
+
             load_dotenv()
         except ImportError:
             pass
@@ -225,22 +230,26 @@ class SchedulingAgent:
             logger.warning(
                 "LLM config incomplete (api_key=%s, api_base=%s, model=%s); "
                 "using heuristic fallback",
-                bool(api_key), bool(api_base), bool(model),
+                bool(api_key),
+                bool(api_base),
+                bool(model),
             )
             return
 
         try:
             from agent.llm_clients.sync_client import SyncLLMClient
 
-            self.llm_client = SyncLLMClient({
-                "api_key": api_key,
-                "api_base": api_base,
-                "model": model,
-                "temperature": llm_config.get("temperature", 0.7),
-                "max_tokens": llm_config.get("max_tokens", 4096),
-                "max_retries": llm_config.get("max_retries", 3),
-                "retry_delay": llm_config.get("retry_delay", 1.0),
-            })
+            self.llm_client = SyncLLMClient(
+                {
+                    "api_key": api_key,
+                    "api_base": api_base,
+                    "model": model,
+                    "temperature": llm_config.get("temperature", 0.7),
+                    "max_tokens": llm_config.get("max_tokens", 4096),
+                    "max_retries": llm_config.get("max_retries", 3),
+                    "retry_delay": llm_config.get("retry_delay", 1.0),
+                }
+            )
             logger.info("LLM client initialized: model=%s", model)
         except Exception as e:
             logger.warning(
@@ -253,35 +262,29 @@ class SchedulingAgent:
         harness_config = self.config.get("harness", {})
 
         # Import here to avoid circular dependencies
-        from harness.task_decomposer import TaskDecomposer
-        from harness.resource_allocator import ResourceAllocator
-        from harness.result_validator import ResultValidator
         from harness.exception_handler import ExceptionHandler
         from harness.feedback_loop import FeedbackLoop
+        from harness.resource_allocator import ResourceAllocator
+        from harness.result_validator import ResultValidator
+        from harness.task_decomposer import TaskDecomposer
 
         self.task_decomposer = TaskDecomposer(harness_config)
         self.resource_allocator = ResourceAllocator(harness_config)
-        self.result_validator = ResultValidator(
-            harness_config.get("validation", {})
-        )
+        self.result_validator = ResultValidator(harness_config.get("validation", {}))
         self.exception_handler = ExceptionHandler(
             harness_config.get("exception_handling", {})
         )
-        self.feedback_loop = FeedbackLoop(
-            harness_config.get("feedback", {})
-        )
+        self.feedback_loop = FeedbackLoop(harness_config.get("feedback", {}))
 
         logger.info("Harness components initialized")
 
     def _init_planner_and_generator(self):
         """Initialize the task planner and code generator."""
-        from agent.planner import TaskPlanner
         from agent.code_generator import CodeGenerator
+        from agent.planner import TaskPlanner
 
         self.planner = TaskPlanner(self.config, llm_client=self.llm_client)
-        self.code_generator = CodeGenerator(
-            self.config, llm_client=self.llm_client
-        )
+        self.code_generator = CodeGenerator(self.config, llm_client=self.llm_client)
 
         logger.info("Planner and code generator initialized")
 
@@ -396,32 +399,37 @@ class SchedulingAgent:
             simulation = self._create_default_simulation(scene_config)
 
         execution_log, sim_total_time = self._execute_tasks(
-            tasks, allocation, simulation, plan, generated_codes
+            tasks, allocation, simulation, plan, generated_codes,
+            scene_config=scene_config,
         )
 
         # --- Step 4b: Result validation ---
         logger.info("[Step 4b] Result validation")
-        validation_result = self.result_validator.validate({
-            "tasks": [
-                {
-                    "id": t.id,
-                    "status": t.status.value,
-                    "duration": (t.end_time or 0) - (t.start_time or 0),
-                }
-                for t in tasks
-            ],
-            "total_duration": sim_total_time,
-            "resource_usage": {
-                arm_id: sum(
-                    (e["end_time"] - e["start_time"])
-                    for e in execution_log
-                    if e["arm_id"] == arm_id
-                )
-                for arm_id in set(e["arm_id"] for e in execution_log)
+        validation_result = self.result_validator.validate(
+            {
+                "tasks": [
+                    {
+                        "id": t.id,
+                        "status": t.status.value,
+                        "duration": (t.end_time or 0) - (t.start_time or 0),
+                    }
+                    for t in tasks
+                ],
+                "total_duration": sim_total_time,
+                "resource_usage": (
+                    {
+                        arm_id: sum(
+                            (e["end_time"] - e["start_time"])
+                            for e in execution_log
+                            if e["arm_id"] == arm_id
+                        )
+                        for arm_id in set(e["arm_id"] for e in execution_log)
+                    }
+                    if execution_log
+                    else {}
+                ),
             }
-            if execution_log
-            else {},
-        })
+        )
         if not validation_result.is_valid:
             logger.warning("Validation failed: %s", validation_result.summary)
         else:
@@ -448,13 +456,11 @@ class SchedulingAgent:
         # Apply feedback adjustments to target modules (close the loop)
         for adj in adjustments:
             if adj.target_module == "resource_allocator":
-                self.resource_allocator.update_config(
-                    {adj.parameter: adj.new_value}
-                )
+                self.resource_allocator.update_config({adj.parameter: adj.new_value})
             elif adj.target_module == "exception_handler":
-                self.exception_handler.update_config(
-                    {adj.parameter: adj.new_value}
-                )
+                self.exception_handler.update_config({adj.parameter: adj.new_value})
+            elif adj.target_module == "code_generator":
+                self.code_generator.update_config({adj.parameter: adj.new_value})
 
         logger.info(
             "Feedback: score=%.2f, %d adjustments, bottlenecks=%s",
@@ -496,8 +502,11 @@ class SchedulingAgent:
         logger.info(
             "=== Execution %s complete: makespan=%.3f, success=%.1f%%, "
             "util=%.1f%%, violations=%d ===",
-            execution_id, makespan, task_success_rate * 100,
-            resource_utilization * 100, constraint_violations,
+            execution_id,
+            makespan,
+            task_success_rate * 100,
+            resource_utilization * 100,
+            constraint_violations,
         )
 
         return result
@@ -510,9 +519,17 @@ class SchedulingAgent:
         n = len(self.execution_history)
         return {
             "average_makespan": sum(r.makespan for r in self.execution_history) / n,
-            "average_success_rate": sum(r.task_success_rate for r in self.execution_history) / n,
-            "average_resource_utilization": sum(r.resource_utilization for r in self.execution_history) / n,
-            "total_constraint_violations": sum(r.constraint_violations for r in self.execution_history),
+            "average_success_rate": sum(
+                r.task_success_rate for r in self.execution_history
+            )
+            / n,
+            "average_resource_utilization": sum(
+                r.resource_utilization for r in self.execution_history
+            )
+            / n,
+            "total_constraint_violations": sum(
+                r.constraint_violations for r in self.execution_history
+            ),
             "total_executions": n,
         }
 
@@ -564,12 +581,11 @@ class SchedulingAgent:
         # Find workpiece initial position
         workpieces = scene_config.get("workpieces", [])
         if task.workpiece_id:
-            wp = next(
-                (w for w in workpieces if w.get("id") == task.workpiece_id), None
-            )
+            wp = next((w for w in workpieces if w.get("id") == task.workpiece_id), None)
             if wp:
                 params["source_position"] = wp.get("initial_position", {})
                 params["workpiece_type"] = wp.get("type", "generic")
+                params["workpiece_id"] = task.workpiece_id
 
         return params
 
@@ -578,24 +594,53 @@ class SchedulingAgent:
     # ------------------------------------------------------------------
 
     def _create_default_simulation(self, scene_config: Dict[str, Any]):
-        """Create a mock simulator when none is provided."""
+        """Create simulation backend. Isaac Sim by default; mock only if explicitly requested."""
+        sim_config = self.config.get("simulation", {})
+        backend = sim_config.get("backend", "isaac")
+
+        if backend == "mock":
+            logger.info("Mock backend explicitly requested via config")
+            return self._create_mock_simulation(scene_config, sim_config)
+
+        # Default: try Isaac Sim
+        try:
+            from simulation.isaac_sim import IsaacSimInterface
+
+            sim = IsaacSimInterface(fallback_to_mock=False)
+            sim.initialize()
+            sim.load_scene(scene_config)
+            logger.info("Created Isaac Sim simulation (real physics)")
+            return sim
+        except ImportError:
+            if backend == "isaac":
+                # Isaac Sim explicitly requested but not available
+                raise RuntimeError(
+                    "Isaac Sim requested but not installed. "
+                    "Install with: pip install isaacsim --extra-index-url https://pypi.nvidia.com"
+                )
+            # Auto mode: fall back to mock with warning
+            logger.warning("Isaac Sim not available, falling back to mock simulator")
+            return self._create_mock_simulation(scene_config, sim_config)
+
+    def _create_mock_simulation(self, scene_config: Dict[str, Any], sim_config: Dict[str, Any]):
+        """Create a mock simulator (only when explicitly requested or as fallback)."""
         from simulation.mock_simulator import MockSimulator
 
-        sim_config = self.config.get("simulation", {})
         mock_config = sim_config.get("mock", {})
 
         sim = MockSimulator(
-            failure_probabilities={"default": mock_config.get("failure_probability", 0.0)},
-            time_scale=1.0,  # Use real time scale (1.0 = normal speed)
+            failure_probabilities={
+                "default": mock_config.get("failure_probability", 0.0)
+            },
+            time_scale=1.0,
             seed=42,
         )
         sim.initialize()
 
-        # Build scene for mock simulator
         mock_scene = self._build_mock_scene(scene_config)
         sim.load_scene(mock_scene)
 
-        logger.info("Created default mock simulator")
+        logger.info("Created mock simulator")
         return sim
 
     def _build_mock_scene(self, scene_config: Dict[str, Any]) -> dict:
@@ -603,19 +648,23 @@ class SchedulingAgent:
         robot_arms = []
         for arm in scene_config.get("robot_arms", []):
             pos = arm.get("base_position") or arm.get("position", {})
-            robot_arms.append({
-                "id": arm["id"],
-                "position": pos,
-            })
+            robot_arms.append(
+                {
+                    "id": arm["id"],
+                    "position": pos,
+                }
+            )
 
         objects = []
         for wp in scene_config.get("workpieces", []):
             pos = wp.get("initial_position", {})
-            objects.append({
-                "id": wp["id"],
-                "type": wp.get("type", "generic"),
-                "position": pos,
-            })
+            objects.append(
+                {
+                    "id": wp["id"],
+                    "type": wp.get("type", "generic"),
+                    "position": pos,
+                }
+            )
 
         return {"robot_arms": robot_arms, "objects": objects}
 
@@ -626,6 +675,7 @@ class SchedulingAgent:
         simulation,
         plan,
         generated_codes: Optional[Dict[str, str]] = None,
+        scene_config: Optional[Dict[str, Any]] = None,
     ) -> tuple:
         """
         Execute tasks in topological order within the simulation.
@@ -653,6 +703,7 @@ class SchedulingAgent:
 
         for level in execution_levels:
             level_end_time = sim_time
+            level_arm_end_times = {}
 
             for task_id in level:
                 task = task_map.get(task_id)
@@ -665,11 +716,14 @@ class SchedulingAgent:
                     task.status = TaskStatus.CANCELLED
                     continue
 
-                # Determine start time (after all dependencies complete)
+                # Determine start time (after all dependencies complete
+                # and after any prior task on the same arm in this level)
                 start_time = sim_time
                 for dep_id in task.dependencies:
                     if dep_id in task_end_times:
                         start_time = max(start_time, task_end_times[dep_id])
+                if arm_id in level_arm_end_times:
+                    start_time = max(start_time, level_arm_end_times[arm_id])
 
                 # --- Execute the generated code in simulation ---
                 attempt = 1
@@ -729,7 +783,8 @@ class SchedulingAgent:
                     if recovery.action_type == RecoveryActionType.SKIP:
                         logger.warning(
                             "Exception handler SKIP for task %s after %d attempts",
-                            task_id, attempt,
+                            task_id,
+                            attempt,
                         )
                         break
                     elif recovery.action_type == RecoveryActionType.REPLAN:
@@ -740,9 +795,60 @@ class SchedulingAgent:
 
                     logger.warning(
                         "Task %s attempt %d failed: %s (recovery=%s)",
-                        task_id, attempt, error_msg,
+                        task_id,
+                        attempt,
+                        error_msg,
                         recovery.action_type.value,
                     )
+
+                    # --- Code regeneration with feedback (close the loop) ---
+                    if attempt < max_attempts:
+                        feedback_data = {
+                            "original_code": code or "",
+                            "execution_result": exec_result or {},
+                            "error": error_msg,
+                        }
+                        try:
+                            if not self.llm_client:
+                                cur_speed = self.code_generator.speed_factor
+                                cur_force = self.code_generator.force_factor
+                                self.code_generator.update_config(
+                                    {
+                                        "code_gen_speed_factor": max(
+                                            0.1, cur_speed * 0.85
+                                        ),
+                                        "code_gen_force_factor": min(
+                                            3.0, cur_force * 1.1
+                                        ),
+                                    }
+                                )
+                            params = self._build_code_parameters(
+                                task, scene_config or {}
+                            )
+                            regen = self.code_generator.generate(
+                                task_name=task.name,
+                                task_description=task.description,
+                                operation_type=task.operation_type,
+                                arm_id=arm_id,
+                                required_capabilities=task.required_capabilities,
+                                parameters=params,
+                                feedback=feedback_data,
+                            )
+                            if regen and regen.code:
+                                generated_codes[task_id] = regen.code
+                                code = regen.code
+                                logger.info(
+                                    "Regenerated code for task %s (method=%s)",
+                                    task_id,
+                                    regen.metadata.get("method", "unknown"),
+                                )
+                        except Exception as regen_err:
+                            logger.debug(
+                                "Code regeneration failed for task %s: %s",
+                                task_id,
+                                regen_err,
+                            )
+
                     attempt += 1
 
                 # Record results
@@ -759,6 +865,7 @@ class SchedulingAgent:
                 task.result = exec_result or {}
 
                 task_end_times[task_id] = end_time
+                level_arm_end_times[arm_id] = end_time
 
                 log_entry = {
                     "task_id": task_id,
@@ -775,14 +882,20 @@ class SchedulingAgent:
                 execution_log.append(log_entry)
 
                 # Collect feedback for this task
-                self.feedback_loop.collect_feedback({
-                    "task_id": task_id,
-                    "arm_id": arm_id,
-                    "status": "success" if success else "failure",
-                    "duration": duration,
-                    "resource_usage": {arm_id: duration},
-                    "errors": [exec_result["error"]] if exec_result and exec_result.get("error") else [],
-                })
+                self.feedback_loop.collect_feedback(
+                    {
+                        "task_id": task_id,
+                        "arm_id": arm_id,
+                        "status": "success" if success else "failure",
+                        "duration": duration,
+                        "resource_usage": {arm_id: duration},
+                        "errors": (
+                            [exec_result["error"]]
+                            if exec_result and exec_result.get("error")
+                            else []
+                        ),
+                    }
+                )
 
                 level_end_time = max(level_end_time, end_time)
 

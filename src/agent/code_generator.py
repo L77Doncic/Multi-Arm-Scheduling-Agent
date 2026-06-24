@@ -9,58 +9,58 @@ operation requirements - NOT pulled from a pre-built skill library.
 import json
 import logging
 import textwrap
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Atomic skill primitives that generated code can call
 ATOMIC_PRIMITIVES = {
-    'move_to': {
-        'params': ['x', 'y', 'z', 'speed'],
-        'description': 'Move end-effector to absolute position',
-        'return': 'bool (success)',
+    "move_to": {
+        "params": ["x", "y", "z", "speed"],
+        "description": "Move end-effector to absolute position",
+        "return": "bool (success)",
     },
-    'grip': {
-        'params': ['force'],
-        'description': 'Close gripper with specified force',
-        'return': 'bool (success)',
+    "grip": {
+        "params": ["force"],
+        "description": "Close gripper with specified force",
+        "return": "bool (success)",
     },
-    'release': {
-        'params': [],
-        'description': 'Open gripper to release object',
-        'return': 'bool (success)',
+    "release": {
+        "params": [],
+        "description": "Open gripper to release object",
+        "return": "bool (success)",
     },
-    'rotate': {
-        'params': ['roll', 'pitch', 'yaw', 'speed'],
-        'description': 'Rotate end-effector to orientation',
-        'return': 'bool (success)',
+    "rotate": {
+        "params": ["roll", "pitch", "yaw", "speed"],
+        "description": "Rotate end-effector to orientation",
+        "return": "bool (success)",
     },
-    'linear_move': {
-        'params': ['dx', 'dy', 'dz', 'speed'],
-        'description': 'Move relative to current position',
-        'return': 'bool (success)',
+    "linear_move": {
+        "params": ["dx", "dy", "dz", "speed"],
+        "description": "Move relative to current position",
+        "return": "bool (success)",
     },
-    'wait': {
-        'params': ['duration'],
-        'description': 'Wait for specified duration (seconds)',
-        'return': 'bool',
+    "wait": {
+        "params": ["duration"],
+        "description": "Wait for specified duration (seconds)",
+        "return": "bool",
     },
-    'check_sensor': {
-        'params': ['sensor_type'],
-        'description': 'Read sensor value (force, vision, proximity)',
-        'return': 'dict (sensor_data)',
+    "check_sensor": {
+        "params": ["sensor_type"],
+        "description": "Read sensor value (force, vision, proximity)",
+        "return": "dict (sensor_data)",
     },
-    'set_payload': {
-        'params': ['mass'],
-        'description': 'Declare current payload mass for dynamics',
-        'return': 'bool',
+    "set_payload": {
+        "params": ["mass"],
+        "description": "Declare current payload mass for dynamics",
+        "return": "bool",
     },
-    'set_compliance': {
-        'params': ['stiffness_x', 'stiffness_y', 'stiffness_z'],
-        'description': 'Set Cartesian stiffness for contact tasks',
-        'return': 'bool',
+    "set_compliance": {
+        "params": ["stiffness_x", "stiffness_y", "stiffness_z"],
+        "description": "Set Cartesian stiffness for contact tasks",
+        "return": "bool",
     },
 }
 
@@ -68,6 +68,7 @@ ATOMIC_PRIMITIVES = {
 @dataclass
 class GeneratedCode:
     """Container for generated executable code."""
+
     task_id: str
     arm_id: str
     code: str
@@ -90,13 +91,39 @@ class CodeGenerator:
         self.config = config
         self.llm_client = llm_client
         self.generation_counter = 0
+        # Feedback-adjustable parameters (multipliers applied to template values)
+        self.speed_factor: float = 1.0
+        self.force_factor: float = 1.0
         logger.info("CodeGenerator initialized")
 
-    def generate(self, task_name: str, task_description: str,
-                 operation_type: str, arm_id: str,
-                 required_capabilities: List[str],
-                 parameters: Optional[Dict] = None,
-                 feedback: Optional[Dict] = None) -> GeneratedCode:
+    def update_config(self, params: Dict[str, Any]) -> None:
+        """
+        Accept runtime parameter updates from the feedback loop.
+
+        Args:
+            params: Dictionary of parameter name -> new value.
+                Supported keys: code_gen_speed_factor, code_gen_force_factor.
+        """
+        if "code_gen_speed_factor" in params:
+            self.speed_factor = float(params["code_gen_speed_factor"])
+        if "code_gen_force_factor" in params:
+            self.force_factor = float(params["code_gen_force_factor"])
+        logger.info(
+            "CodeGenerator config updated: speed_factor=%.2f, force_factor=%.2f",
+            self.speed_factor,
+            self.force_factor,
+        )
+
+    def generate(
+        self,
+        task_name: str,
+        task_description: str,
+        operation_type: str,
+        arm_id: str,
+        required_capabilities: List[str],
+        parameters: Optional[Dict] = None,
+        feedback: Optional[Dict] = None,
+    ) -> GeneratedCode:
         """
         Generate executable code for a specific task on a specific arm.
 
@@ -113,33 +140,55 @@ class CodeGenerator:
             GeneratedCode with the executable Python code.
         """
         self.generation_counter += 1
-        logger.info("Generating code for %s on %s (op=%s)",
-                     task_name, arm_id, operation_type)
+        logger.info(
+            "Generating code for %s on %s (op=%s)", task_name, arm_id, operation_type
+        )
 
         if self.llm_client and not feedback:
             code = self._generate_with_llm(
-                task_name, task_description, operation_type,
-                arm_id, required_capabilities, parameters
+                task_name,
+                task_description,
+                operation_type,
+                arm_id,
+                required_capabilities,
+                parameters,
             )
         elif self.llm_client and feedback:
             code = self._refine_with_llm(
-                task_name, task_description, operation_type,
-                arm_id, required_capabilities, parameters, feedback
+                task_name,
+                task_description,
+                operation_type,
+                arm_id,
+                required_capabilities,
+                parameters,
+                feedback,
             )
         else:
             code = self._generate_with_template(
-                task_name, task_description, operation_type,
-                arm_id, required_capabilities, parameters
+                task_name,
+                task_description,
+                operation_type,
+                arm_id,
+                required_capabilities,
+                parameters,
             )
 
-        logger.info("Generated code for %s using primitives: %s",
-                     task_name, code.primitives_used)
+        logger.info(
+            "Generated code for %s using primitives: %s",
+            task_name,
+            code.primitives_used,
+        )
         return code
 
-    def _generate_with_template(self, task_name: str, task_description: str,
-                                 operation_type: str, arm_id: str,
-                                 capabilities: List[str],
-                                 parameters: Optional[Dict]) -> GeneratedCode:
+    def _generate_with_template(
+        self,
+        task_name: str,
+        task_description: str,
+        operation_type: str,
+        arm_id: str,
+        capabilities: List[str],
+        parameters: Optional[Dict],
+    ) -> GeneratedCode:
         """Generate code using template-based composition."""
         params = parameters or {}
         primitives_used: List[str] = []
@@ -150,8 +199,8 @@ class CodeGenerator:
         code_lines.append(f"def {func_name}(arm_interface):")
         code_lines.append(f'    """')
         code_lines.append(f"    {task_description}")
-        code_lines.append(f'    Arm: {arm_id}')
-        code_lines.append(f'    Operation: {operation_type}')
+        code_lines.append(f"    Arm: {arm_id}")
+        code_lines.append(f"    Operation: {operation_type}")
         code_lines.append(f'    """')
         code_lines.append(f"    results = {{}}")
         code_lines.append(f"    start_time = time.time()")
@@ -159,38 +208,52 @@ class CodeGenerator:
 
         # Compose operation-specific code from primitives
         op_lines: List[str] = []
-        if operation_type in ('pick', 'pick_workpiece_from_feed', 'pick_from_feed'):
+        if operation_type in ("pick", "pick_workpiece_from_feed", "pick_from_feed"):
             op_lines, prims = self._compose_pick_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('place', 'package', 'package_and_output',
-                                 'output', 'drop'):
+        elif operation_type in (
+            "place",
+            "package",
+            "package_and_output",
+            "output",
+            "drop",
+        ):
             op_lines, prims = self._compose_place_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('move', 'transfer', 'transport'):
+        elif operation_type in ("move", "transfer", "transport"):
             op_lines, prims = self._compose_move_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('assemble', 'assemble_components',
-                                 'final_assembly', 'join', 'connect'):
+        elif operation_type in (
+            "assemble",
+            "assemble_components",
+            "final_assembly",
+            "join",
+            "connect",
+        ):
             op_lines, prims = self._compose_assemble_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('inspect', 'quality_inspection',
-                                 'quality_check', 'verify'):
+        elif operation_type in (
+            "inspect",
+            "quality_inspection",
+            "quality_check",
+            "verify",
+        ):
             op_lines, prims = self._compose_inspect_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('tighten', 'secure', 'bolt'):
+        elif operation_type in ("tighten", "secure", "bolt"):
             op_lines, prims = self._compose_tighten_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('weld', 'weld_joints', 'solder'):
+        elif operation_type in ("weld", "weld_joints", "solder"):
             op_lines, prims = self._compose_weld_code(params)
             primitives_used.extend(prims)
 
-        elif operation_type in ('prepare', 'prepare_workpiece', 'prep'):
+        elif operation_type in ("prepare", "prepare_workpiece", "prep"):
             op_lines, prims = self._compose_prep_code(params)
             primitives_used.extend(prims)
 
@@ -211,7 +274,7 @@ class CodeGenerator:
 
         # Full module code with imports
         imports = ["import time"]
-        if 'check_sensor' in primitives_used:
+        if "check_sensor" in primitives_used:
             imports.append("import numpy as np")
 
         full_code = "\n".join(imports) + "\n\n\n" + code_body
@@ -222,8 +285,8 @@ class CodeGenerator:
             code=full_code,
             imports=imports,
             primitives_used=list(set(primitives_used)),
-            estimated_duration=params.get('estimated_duration', 3.0),
-            metadata={'method': 'template', 'operation_type': operation_type}
+            estimated_duration=params.get("estimated_duration", 3.0),
+            metadata={"method": "template", "operation_type": operation_type},
         )
 
     def _compose_pick_code(self, params: Dict) -> tuple:
@@ -231,25 +294,36 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('target_position', {'x': 0, 'y': 0, 'z': 0.5})
-        approach_z = target.get('z', 0.5) + 0.15
-        force = params.get('grip_force', 50.0)
+        # Use workpiece position for pick, not station position
+        target = params.get("source_position", params.get("target_position", {"x": 0, "y": 0, "z": 0.5}))
+        approach_z = target.get("z", 0.5) + 0.15
+        force = params.get("grip_force", 50.0) * self.force_factor
+        desc_speed = round(0.5 * self.speed_factor, 2)
+        lift_speed = round(0.3 * self.speed_factor, 2)
+        workpiece_id = params.get("workpiece_id", "")
 
-        lines.append(f"    # Approach position above target")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {approach_z})")
-        prims.append('move_to')
+        lines.append(f"    # Approach workpiece at ({target['x']}, {target['y']}, {target['z']})")
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {approach_z})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Descend to target")
-        lines.append(f"    arm_interface.linear_move(0, 0, {target['z'] - approach_z}, speed=0.5)")
-        prims.append('linear_move')
+        lines.append(
+            f"    arm_interface.linear_move(0, 0, {target['z'] - approach_z}, speed={desc_speed})"
+        )
+        prims.append("linear_move")
 
         lines.append(f"    # Grip object")
-        lines.append(f"    arm_interface.grip(force={force})")
-        prims.append('grip')
+        if workpiece_id:
+            lines.append(f"    arm_interface.grip(force={round(force, 1)}, target_id=\"{workpiece_id}\")")
+        else:
+            lines.append(f"    arm_interface.grip(force={round(force, 1)})")
+        prims.append("grip")
 
         lines.append(f"    # Lift object")
-        lines.append(f"    arm_interface.linear_move(0, 0, 0.1, speed=0.3)")
-        prims.append('linear_move')
+        lines.append(f"    arm_interface.linear_move(0, 0, 0.1, speed={lift_speed})")
+        prims.append("linear_move")
 
         lines.append(f"    results['success'] = True")
         lines.append(f"    results['picked'] = True")
@@ -261,23 +335,31 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('target_position', {'x': 0, 'y': 0, 'z': 0.3})
+        target = params.get("target_position", {"x": 0, "y": 0, "z": 0.3})
+        lower_speed = round(0.3 * self.speed_factor, 2)
+        retract_speed = round(0.5 * self.speed_factor, 2)
+        workpiece_id = params.get("workpiece_id", "")
 
         lines.append(f"    # Move to place position")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z'] + 0.1})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z'] + 0.1})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Lower to surface")
-        lines.append(f"    arm_interface.linear_move(0, 0, -0.1, speed=0.3)")
-        prims.append('linear_move')
+        lines.append(f"    arm_interface.linear_move(0, 0, -0.1, speed={lower_speed})")
+        prims.append("linear_move")
 
         lines.append(f"    # Release object")
-        lines.append(f"    arm_interface.release()")
-        prims.append('release')
+        if workpiece_id:
+            lines.append(f"    arm_interface.release(target_id=\"{workpiece_id}\")")
+        else:
+            lines.append(f"    arm_interface.release()")
+        prims.append("release")
 
         lines.append(f"    # Retract")
-        lines.append(f"    arm_interface.linear_move(0, 0, 0.15, speed=0.5)")
-        prims.append('linear_move')
+        lines.append(f"    arm_interface.linear_move(0, 0, 0.15, speed={retract_speed})")
+        prims.append("linear_move")
 
         lines.append(f"    results['success'] = True")
         lines.append(f"    results['placed'] = True")
@@ -289,16 +371,20 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        source = params.get('source_position', {'x': 0, 'y': 0, 'z': 0.5})
-        dest = params.get('target_position', {'x': 2, 'y': 0, 'z': 0.5})
-        speed = params.get('speed', 1.0)
+        source = params.get("source_position", {"x": 0, "y": 0, "z": 0.5})
+        dest = params.get("target_position", {"x": 2, "y": 0, "z": 0.5})
+        speed = round(params.get("speed", 1.0) * self.speed_factor, 2)
 
         lines.append(f"    # Move to destination")
-        lines.append(f"    arm_interface.move_to({dest['x']}, {dest['y']}, {dest['z']}, speed={speed})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({dest['x']}, {dest['y']}, {dest['z']}, speed={speed})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    results['success'] = True")
-        lines.append(f"    results['moved_to'] = ({dest['x']}, {dest['y']}, {dest['z']})")
+        lines.append(
+            f"    results['moved_to'] = ({dest['x']}, {dest['y']}, {dest['z']})"
+        )
 
         return lines, prims
 
@@ -307,24 +393,29 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('assembly_position', {'x': 2, 'y': 0, 'z': 0.5})
-        force = params.get('assembly_force', 30.0)
+        target = params.get("assembly_position", {"x": 2, "y": 0, "z": 0.5})
+        force = params.get("assembly_force", 30.0) * self.force_factor
+        desc_speed = round(0.1 * self.speed_factor, 2)
 
         lines.append(f"    # Move to assembly position")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Set compliance for contact")
-        lines.append(f"    arm_interface.set_compliance(stiffness_x=200, stiffness_y=200, stiffness_z=100)")
-        prims.append('set_compliance')
+        lines.append(
+            f"    arm_interface.set_compliance(stiffness_x=200, stiffness_y=200, stiffness_z=100)"
+        )
+        prims.append("set_compliance")
 
         lines.append(f"    # Apply assembly force via slow descent")
-        lines.append(f"    arm_interface.linear_move(0, 0, -0.05, speed=0.1)")
-        prims.append('linear_move')
+        lines.append(f"    arm_interface.linear_move(0, 0, -0.05, speed={desc_speed})")
+        prims.append("linear_move")
 
         lines.append(f"    # Verify assembly with force sensor")
         lines.append(f"    sensor_data = arm_interface.check_sensor('force')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    assembly_ok = abs(sensor_data.get('fz', 0)) > {force * 0.5}")
         lines.append(f"    results['assembly_force'] = sensor_data.get('fz', 0)")
@@ -337,15 +428,17 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('inspection_position', {'x': 4, 'y': 0, 'z': 0.5})
+        target = params.get("inspection_position", {"x": 4, "y": 0, "z": 0.5})
 
         lines.append(f"    # Move to inspection position")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Capture vision data")
         lines.append(f"    vision_data = arm_interface.check_sensor('vision')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    # Analyze inspection result")
         lines.append(f"    defect_score = vision_data.get('defect_score', 0.0)")
@@ -361,23 +454,27 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('fastener_position', {'x': 2, 'y': 0, 'z': 0.5})
-        torque = params.get('target_torque', 5.0)
+        target = params.get("fastener_position", {"x": 2, "y": 0, "z": 0.5})
+        torque = params.get("target_torque", 5.0)
 
         lines.append(f"    # Move to fastener position")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Rotate to tighten")
         lines.append(f"    arm_interface.rotate(roll=0, pitch=0, yaw=360, speed=0.5)")
-        prims.append('rotate')
+        prims.append("rotate")
 
         lines.append(f"    # Verify torque")
         lines.append(f"    torque_data = arm_interface.check_sensor('force')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    results['applied_torque'] = torque_data.get('tz', 0)")
-        lines.append(f"    results['success'] = abs(torque_data.get('tz', 0)) >= {torque * 0.8}")
+        lines.append(
+            f"    results['success'] = abs(torque_data.get('tz', 0)) >= {torque * 0.8}"
+        )
 
         return lines, prims
 
@@ -386,24 +483,28 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        start = params.get('weld_start', {'x': 2, 'y': -0.5, 'z': 0.5})
-        end = params.get('weld_end', {'x': 2, 'y': 0.5, 'z': 0.5})
+        start = params.get("weld_start", {"x": 2, "y": -0.5, "z": 0.5})
+        end = params.get("weld_end", {"x": 2, "y": 0.5, "z": 0.5})
 
         lines.append(f"    # Move to weld start position")
-        lines.append(f"    arm_interface.move_to({start['x']}, {start['y']}, {start['z']})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({start['x']}, {start['y']}, {start['z']})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Enable welding tool")
         lines.append(f"    arm_interface.check_sensor('weld_trigger')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    # Linear weld pass")
-        lines.append(f"    arm_interface.linear_move(0, {end['y'] - start['y']}, 0, speed=0.2)")
-        prims.append('linear_move')
+        lines.append(
+            f"    arm_interface.linear_move(0, {end['y'] - start['y']}, 0, speed=0.2)"
+        )
+        prims.append("linear_move")
 
         lines.append(f"    # Verify weld quality")
         lines.append(f"    weld_data = arm_interface.check_sensor('vision')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    results['weld_length'] = abs({end['y'] - start['y']})")
         lines.append(f"    results['quality'] = weld_data.get('weld_quality', 0.9)")
@@ -416,19 +517,21 @@ class CodeGenerator:
         lines = []
         prims = []
 
-        target = params.get('prep_position', {'x': 2, 'y': 0, 'z': 0.5})
+        target = params.get("prep_position", {"x": 2, "y": 0, "z": 0.5})
 
         lines.append(f"    # Move to preparation station")
-        lines.append(f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})")
-        prims.append('move_to')
+        lines.append(
+            f"    arm_interface.move_to({target['x']}, {target['y']}, {target['z']})"
+        )
+        prims.append("move_to")
 
         lines.append(f"    # Orient workpiece for processing")
         lines.append(f"    arm_interface.rotate(roll=0, pitch=90, yaw=0, speed=0.5)")
-        prims.append('rotate')
+        prims.append("rotate")
 
         lines.append(f"    # Check alignment")
         lines.append(f"    align_data = arm_interface.check_sensor('vision')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    results['aligned'] = align_data.get('alignment_ok', True)")
         lines.append(f"    results['success'] = True")
@@ -443,21 +546,26 @@ class CodeGenerator:
         lines.append(f"    # Generic operation: {operation_type}")
         lines.append(f"    # Check environment")
         lines.append(f"    env_data = arm_interface.check_sensor('proximity')")
-        prims.append('check_sensor')
+        prims.append("check_sensor")
 
         lines.append(f"    # Execute operation")
         lines.append(f"    arm_interface.wait(duration=1.0)")
-        prims.append('wait')
+        prims.append("wait")
 
         lines.append(f"    results['operation'] = '{operation_type}'")
         lines.append(f"    results['success'] = True")
 
         return lines, prims
 
-    def _generate_with_llm(self, task_name: str, task_description: str,
-                            operation_type: str, arm_id: str,
-                            capabilities: List[str],
-                            parameters: Optional[Dict]) -> GeneratedCode:
+    def _generate_with_llm(
+        self,
+        task_name: str,
+        task_description: str,
+        operation_type: str,
+        arm_id: str,
+        capabilities: List[str],
+        parameters: Optional[Dict],
+    ) -> GeneratedCode:
         """Use LLM to generate code for a task."""
         from .prompts.code_generation import code_generate_prompt
 
@@ -468,7 +576,7 @@ class CodeGenerator:
             arm_id=arm_id,
             capabilities=capabilities,
             parameters=parameters or {},
-            available_primitives=list(ATOMIC_PRIMITIVES.keys())
+            available_primitives=list(ATOMIC_PRIMITIVES.keys()),
         )
 
         try:
@@ -483,30 +591,39 @@ class CodeGenerator:
                 code=code_text,
                 imports=["import time", "import numpy as np"],
                 primitives_used=primitives,
-                estimated_duration=(parameters or {}).get('estimated_duration', 3.0),
-                metadata={'method': 'llm', 'operation_type': operation_type}
+                estimated_duration=(parameters or {}).get("estimated_duration", 3.0),
+                metadata={"method": "llm", "operation_type": operation_type},
             )
         except Exception as e:
             logger.warning("LLM code generation failed (%s), using template", e)
             return self._generate_with_template(
-                task_name, task_description, operation_type,
-                arm_id, capabilities, parameters
+                task_name,
+                task_description,
+                operation_type,
+                arm_id,
+                capabilities,
+                parameters,
             )
 
-    def _refine_with_llm(self, task_name: str, task_description: str,
-                          operation_type: str, arm_id: str,
-                          capabilities: List[str],
-                          parameters: Optional[Dict],
-                          feedback: Dict) -> GeneratedCode:
+    def _refine_with_llm(
+        self,
+        task_name: str,
+        task_description: str,
+        operation_type: str,
+        arm_id: str,
+        capabilities: List[str],
+        parameters: Optional[Dict],
+        feedback: Dict,
+    ) -> GeneratedCode:
         """Refine previously generated code based on execution feedback."""
         from .prompts.code_generation import code_refine_prompt
 
         prompt = code_refine_prompt(
             task_name=task_name,
-            original_code=feedback.get('original_code', ''),
-            execution_result=feedback.get('execution_result', {}),
-            error_message=feedback.get('error', ''),
-            available_primitives=list(ATOMIC_PRIMITIVES.keys())
+            original_code=feedback.get("original_code", ""),
+            execution_result=feedback.get("execution_result", {}),
+            error_message=feedback.get("error", ""),
+            available_primitives=list(ATOMIC_PRIMITIVES.keys()),
         )
 
         try:
@@ -520,14 +637,18 @@ class CodeGenerator:
                 code=code_text,
                 imports=["import time", "import numpy as np"],
                 primitives_used=primitives,
-                estimated_duration=(parameters or {}).get('estimated_duration', 3.0),
-                metadata={'method': 'llm_refined', 'operation_type': operation_type}
+                estimated_duration=(parameters or {}).get("estimated_duration", 3.0),
+                metadata={"method": "llm_refined", "operation_type": operation_type},
             )
         except Exception as e:
             logger.warning("LLM code refinement failed (%s), using template", e)
             return self._generate_with_template(
-                task_name, task_description, operation_type,
-                arm_id, capabilities, parameters
+                task_name,
+                task_description,
+                operation_type,
+                arm_id,
+                capabilities,
+                parameters,
             )
 
     def _extract_code_from_response(self, response: str) -> str:

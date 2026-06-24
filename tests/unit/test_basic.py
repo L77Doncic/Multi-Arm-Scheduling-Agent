@@ -2,17 +2,19 @@
 Basic unit tests for Multi-Arm Scheduling Agent
 """
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 
 def test_import_agent():
     """Test that agent module can be imported."""
-    from agent.core import SchedulingAgent, Task, RobotArm, TaskStatus
+    from agent.core import RobotArm, SchedulingAgent, Task, TaskStatus
+
     assert SchedulingAgent is not None
     assert Task is not None
     assert RobotArm is not None
@@ -22,6 +24,7 @@ def test_import_agent():
 def test_task_status_enum():
     """Test TaskStatus enum values."""
     from agent.core import TaskStatus
+
     assert TaskStatus.PENDING.value == "pending"
     assert TaskStatus.IN_PROGRESS.value == "in_progress"
     assert TaskStatus.COMPLETED.value == "completed"
@@ -32,12 +35,13 @@ def test_task_status_enum():
 def test_task_creation():
     """Test Task data class creation."""
     from agent.core import Task, TaskStatus
+
     task = Task(
         id="task_001",
         name="Pick Component",
         description="Pick up component A from conveyor",
         dependencies=[],
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     assert task.id == "task_001"
     assert task.name == "Pick Component"
@@ -48,10 +52,9 @@ def test_task_creation():
 def test_robot_arm_creation():
     """Test RobotArm data class creation."""
     from agent.core import RobotArm
+
     arm = RobotArm(
-        id="arm_001",
-        name="Left Arm",
-        capabilities=["pick", "place", "move"]
+        id="arm_001", name="Left Arm", capabilities=["pick", "place", "move"]
     )
     assert arm.id == "arm_001"
     assert arm.name == "Left Arm"
@@ -62,23 +65,21 @@ def test_robot_arm_creation():
 def test_scheduling_agent_initialization():
     """Test SchedulingAgent initialization."""
     from agent.core import SchedulingAgent
+
     config = {
-        'robot_arms': [
-            {
-                'id': 'arm_001',
-                'name': 'Test Arm',
-                'capabilities': ['pick', 'place']
-            }
+        "robot_arms": [
+            {"id": "arm_001", "name": "Test Arm", "capabilities": ["pick", "place"]}
         ]
     }
     agent = SchedulingAgent(config)
     assert len(agent.robot_arms) == 1
-    assert 'arm_001' in agent.robot_arms
+    assert "arm_001" in agent.robot_arms
 
 
 def test_task_decomposer_import():
     """Test that task decomposer module can be imported."""
-    from harness.task_decomposer import TaskDecomposer, DecomposedTask
+    from harness.task_decomposer import DecomposedTask, TaskDecomposer
+
     assert TaskDecomposer is not None
     assert DecomposedTask is not None
 
@@ -86,6 +87,7 @@ def test_task_decomposer_import():
 def test_task_decomposer_initialization():
     """Test TaskDecomposer initialization."""
     from harness.task_decomposer import TaskDecomposer
+
     config = {}
     decomposer = TaskDecomposer(config)
     assert decomposer.config == config
@@ -95,6 +97,7 @@ def test_task_decomposer_initialization():
 def test_task_decomposition():
     """Test basic task decomposition."""
     from harness.task_decomposer import TaskDecomposer
+
     config = {}
     decomposer = TaskDecomposer(config)
 
@@ -163,14 +166,16 @@ def test_result_validator_valid_result():
     from harness.result_validator import ResultValidator
 
     validator = ResultValidator({})
-    result = validator.validate({
-        "tasks": [
-            {"id": "t1", "status": "completed", "duration": 2.0},
-            {"id": "t2", "status": "completed", "duration": 3.0},
-        ],
-        "total_duration": 5.0,
-        "resource_usage": {"a1": 2.0, "a2": 3.0},
-    })
+    result = validator.validate(
+        {
+            "tasks": [
+                {"id": "t1", "status": "completed", "duration": 2.0},
+                {"id": "t2", "status": "completed", "duration": 3.0},
+            ],
+            "total_duration": 5.0,
+            "resource_usage": {"a1": 2.0, "a2": 3.0},
+        }
+    )
     assert result.is_valid is True
     assert len(result.violations) == 0
 
@@ -180,13 +185,15 @@ def test_result_validator_task_failure():
     from harness.result_validator import ResultValidator
 
     validator = ResultValidator({})
-    result = validator.validate({
-        "tasks": [
-            {"id": "t1", "status": "completed", "duration": 2.0},
-            {"id": "t2", "status": "failed", "duration": 0.0},
-        ],
-        "total_duration": 2.0,
-    })
+    result = validator.validate(
+        {
+            "tasks": [
+                {"id": "t1", "status": "completed", "duration": 2.0},
+                {"id": "t2", "status": "failed", "duration": 0.0},
+            ],
+            "total_duration": 2.0,
+        }
+    )
     assert result.is_valid is False
     assert len(result.violations) >= 1
 
@@ -244,14 +251,16 @@ def test_feedback_loop_collect_and_analyze():
 
     loop = FeedbackLoop({})
     for i in range(5):
-        loop.collect_feedback({
-            "task_id": f"t{i}",
-            "arm_id": "a1",
-            "status": "success",
-            "duration": 2.0 + i * 0.5,
-            "resource_usage": {"a1": 2.0},
-            "errors": [],
-        })
+        loop.collect_feedback(
+            {
+                "task_id": f"t{i}",
+                "arm_id": "a1",
+                "status": "success",
+                "duration": 2.0 + i * 0.5,
+                "resource_usage": {"a1": 2.0},
+                "errors": [],
+            }
+        )
     analysis = loop.analyze_feedback()
     assert analysis.performance_score > 0.0
     assert isinstance(analysis.bottlenecks, list)
@@ -265,20 +274,169 @@ def test_feedback_loop_adjust_strategy():
     loop = FeedbackLoop({})
     # Inject mostly failures to trigger adjustments
     for i in range(10):
-        loop.collect_feedback({
-            "task_id": f"t{i % 3}",
-            "arm_id": "a1",
-            "status": "failure",
-            "duration": 0.0,
-            "resource_usage": {},
-            "errors": ["timeout"],
-        })
+        loop.collect_feedback(
+            {
+                "task_id": f"t{i % 3}",
+                "arm_id": "a1",
+                "status": "failure",
+                "duration": 0.0,
+                "resource_usage": {},
+                "errors": ["timeout"],
+            }
+        )
     analysis = loop.analyze_feedback()
     adjustments = loop.adjust_strategy(analysis)
     # Should produce at least timeout and retry adjustments
     assert len(adjustments) >= 1
     strategy = loop.get_current_strategy()
     assert "retry_count" in strategy
+
+
+def test_feedback_loop_code_gen_adjustment():
+    """Test that feedback loop adjusts code generation parameters on failures."""
+    from harness.feedback_loop import FeedbackLoop
+
+    loop = FeedbackLoop({})
+    # Mix of successes and failures (>20% failure rate)
+    for i in range(3):
+        loop.collect_feedback(
+            {
+                "task_id": f"ok{i}",
+                "arm_id": "a1",
+                "status": "success",
+                "duration": 2.0,
+                "resource_usage": {},
+                "errors": [],
+            }
+        )
+    for i in range(3):
+        loop.collect_feedback(
+            {
+                "task_id": f"fail{i}",
+                "arm_id": "a1",
+                "status": "failure",
+                "duration": 0.0,
+                "resource_usage": {},
+                "errors": ["execution error"],
+            }
+        )
+
+    analysis = loop.analyze_feedback()
+    adjustments = loop.adjust_strategy(analysis)
+
+    code_gen_adjs = [a for a in adjustments if a.target_module == "code_generator"]
+    assert len(code_gen_adjs) >= 1, "Expected code_generator adjustments"
+
+    strategy = loop.get_current_strategy()
+    assert strategy["code_gen_speed_factor"] < 1.0
+    assert strategy["code_gen_force_factor"] > 1.0
+
+
+def test_code_generator_update_config():
+    """Test CodeGenerator accepts feedback-driven config updates."""
+    from agent.code_generator import CodeGenerator
+
+    gen = CodeGenerator({})
+    assert gen.speed_factor == 1.0
+    assert gen.force_factor == 1.0
+
+    gen.update_config({"code_gen_speed_factor": 0.8})
+    assert gen.speed_factor == 0.8
+
+    gen.update_config({"code_gen_force_factor": 1.5})
+    assert gen.force_factor == 1.5
+
+
+def test_code_generator_speed_force_factors():
+    """Test that speed_factor and force_factor affect generated code."""
+    from agent.code_generator import CodeGenerator
+
+    gen_default = CodeGenerator({})
+    gen_slow = CodeGenerator({})
+    gen_slow.update_config({"code_gen_speed_factor": 0.5, "code_gen_force_factor": 2.0})
+
+    params = {"target_position": {"x": 1.0, "y": 0.5, "z": 0.3}}
+    code_default = gen_default.generate(
+        task_name="pick_test",
+        task_description="pick",
+        operation_type="pick",
+        arm_id="a1",
+        required_capabilities=["pick"],
+        parameters=params,
+    )
+    code_slow = gen_slow.generate(
+        task_name="pick_test",
+        task_description="pick",
+        operation_type="pick",
+        arm_id="a1",
+        required_capabilities=["pick"],
+        parameters=params,
+    )
+
+    assert code_default.code != code_slow.code
+    assert "speed=0.5" in code_default.code
+    assert "speed=0.25" in code_slow.code
+    assert "force=50.0" in code_default.code
+    assert "force=100.0" in code_slow.code
+
+
+def test_code_regeneration_on_failure():
+    """Test that code is regenerated with adjusted factors after a task failure."""
+    from agent.core import SchedulingAgent
+    from simulation.mock_simulator import MockSimulator
+
+    config = {
+        "robot_arms": [
+            {
+                "id": "a1",
+                "name": "A1",
+                "capabilities": ["pick", "place", "move"],
+            },
+        ],
+        "harness": {
+            "feedback": {},
+            "validation": {},
+            "exception_handling": {},
+        },
+    }
+    agent = SchedulingAgent(config)
+
+    sim = MockSimulator(failure_probabilities={"pick": 1.0}, time_scale=1.0, seed=42)
+    sim.initialize()
+    sim.load_scene(
+        {
+            "robot_arms": [
+                {"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}
+            ],
+            "objects": [
+                {
+                    "id": "obj1",
+                    "type": "workpiece",
+                    "position": {"x": 1, "y": 0, "z": 0},
+                }
+            ],
+        }
+    )
+
+    result = agent.execute_scheduling(
+        instruction="Pick up workpiece",
+        scene_config={
+            "robot_arms": config["robot_arms"],
+            "workpieces": [
+                {
+                    "id": "obj1",
+                    "type": "part",
+                    "initial_position": {"x": 1, "y": 0, "z": 0},
+                }
+            ],
+        },
+        simulation=sim,
+    )
+
+    assert agent.code_generator.speed_factor < 1.0
+    assert agent.code_generator.force_factor > 1.0
+
+    sim.close()
 
 
 # ------------------------------------------------------------------
@@ -292,11 +450,21 @@ def test_mock_simulator_execute_action():
 
     sim = MockSimulator(time_scale=1.0, seed=42)
     sim.initialize()
-    sim.load_scene({
-        "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
-        "objects": [{"id": "obj1", "type": "workpiece", "position": {"x": 1, "y": 0, "z": 0}}],
-    })
-    result = sim.execute_action("a1", {"type": "move", "position": {"x": 1, "y": 0, "z": 0}})
+    sim.load_scene(
+        {
+            "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
+            "objects": [
+                {
+                    "id": "obj1",
+                    "type": "workpiece",
+                    "position": {"x": 1, "y": 0, "z": 0},
+                }
+            ],
+        }
+    )
+    result = sim.execute_action(
+        "a1", {"type": "move", "position": {"x": 1, "y": 0, "z": 0}}
+    )
     assert result.success is True
     sim.close()
 
@@ -312,10 +480,18 @@ def test_mock_simulator_failure_injection():
         seed=42,
     )
     sim.initialize()
-    sim.load_scene({
-        "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
-        "objects": [{"id": "obj1", "type": "workpiece", "position": {"x": 0, "y": 0, "z": 0}}],
-    })
+    sim.load_scene(
+        {
+            "robot_arms": [{"id": "a1", "position": {"x": 0, "y": 0, "z": 0}}],
+            "objects": [
+                {
+                    "id": "obj1",
+                    "type": "workpiece",
+                    "position": {"x": 0, "y": 0, "z": 0},
+                }
+            ],
+        }
+    )
     result = sim.execute_action("a1", {"type": "pick", "target": "obj1"})
     assert result.success is False
     sim.close()
@@ -332,13 +508,24 @@ def test_full_pipeline_integration():
 
     config = {
         "robot_arms": [
-            {"id": "arm_001", "name": "Arm1", "capabilities": ["pick", "place", "move", "assemble"]},
-            {"id": "arm_002", "name": "Arm2", "capabilities": ["pick", "place", "move", "assemble"]},
+            {
+                "id": "arm_001",
+                "name": "Arm1",
+                "capabilities": ["pick", "place", "move", "assemble"],
+            },
+            {
+                "id": "arm_002",
+                "name": "Arm2",
+                "capabilities": ["pick", "place", "move", "assemble"],
+            },
         ],
         "harness": {
             "feedback": {},
             "validation": {},
             "exception_handling": {},
+        },
+        "simulation": {
+            "backend": "mock",  # Use mock for unit tests (no GPU required)
         },
     }
     agent = SchedulingAgent(config)

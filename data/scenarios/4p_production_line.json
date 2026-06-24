@@ -1,0 +1,326 @@
+{
+  "scenario": {
+    "name": "MRTA-4p-ProductionLine",
+    "description": "Production line scenario converted from MRTA-Benchmark 4p instance",
+    "stations": [
+      {
+        "id": "station_feed",
+        "name": "Feed Station",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "capabilities_required": [
+          "pick"
+        ],
+        "operation": "feed",
+        "estimated_duration": 88.0,
+        "task_count": 1,
+        "task_ids": [
+          6
+        ],
+        "predecessors": [],
+        "successors": [
+          "station_inspection"
+        ]
+      },
+      {
+        "id": "station_transport",
+        "name": "Transport Station",
+        "position": {
+          "x": 2,
+          "y": 0,
+          "z": 0
+        },
+        "capabilities_required": [
+          "pick",
+          "place"
+        ],
+        "operation": "transport",
+        "estimated_duration": 62.0,
+        "task_count": 2,
+        "task_ids": [
+          1,
+          2
+        ],
+        "predecessors": [
+          "station_feed"
+        ],
+        "successors": [
+          "station_inspection"
+        ]
+      },
+      {
+        "id": "station_assembly",
+        "name": "Assembly Station",
+        "position": {
+          "x": 4,
+          "y": 0,
+          "z": 0
+        },
+        "capabilities_required": [
+          "assemble",
+          "place"
+        ],
+        "operation": "assembly",
+        "estimated_duration": 0.0,
+        "task_count": 0,
+        "task_ids": [],
+        "predecessors": [
+          "station_feed"
+        ],
+        "successors": [
+          "station_inspection"
+        ]
+      },
+      {
+        "id": "station_inspection",
+        "name": "Inspection Station",
+        "position": {
+          "x": 6,
+          "y": 0,
+          "z": 0
+        },
+        "capabilities_required": [
+          "inspect"
+        ],
+        "operation": "inspection",
+        "estimated_duration": 60.4,
+        "task_count": 5,
+        "task_ids": [
+          3,
+          4,
+          5,
+          7,
+          8
+        ],
+        "predecessors": [
+          "station_feed"
+        ],
+        "successors": []
+      }
+    ],
+    "workpieces": [
+      {
+        "id": "wp_A",
+        "type": "assembly_part",
+        "initial_position": {
+          "x": -1.0,
+          "y": -0.5,
+          "z": 0.5
+        },
+        "target_station": "station_inspection",
+        "priority": 1,
+        "task_count": 4,
+        "task_ids": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "operations_sequence": [
+          "station_feed",
+          "station_transport",
+          "station_assembly",
+          "station_inspection"
+        ]
+      },
+      {
+        "id": "wp_B",
+        "type": "assembly_part",
+        "initial_position": {
+          "x": -1.0,
+          "y": 0.5,
+          "z": 0.5
+        },
+        "target_station": "station_inspection",
+        "priority": 1,
+        "task_count": 4,
+        "task_ids": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "operations_sequence": [
+          "station_feed",
+          "station_transport",
+          "station_assembly",
+          "station_inspection"
+        ]
+      }
+    ],
+    "robot_arms": [
+      {
+        "id": "arm_001",
+        "name": "Robot 0",
+        "type": "6-DOF",
+        "base_position": {
+          "x": 0.0,
+          "y": -1.5,
+          "z": 0.0
+        },
+        "capabilities": [
+          "assemble",
+          "move",
+          "inspect"
+        ],
+        "reach_radius": 1.5,
+        "max_payload": 5.0,
+        "max_speed": 2.0
+      },
+      {
+        "id": "arm_002",
+        "name": "Robot 1",
+        "type": "6-DOF",
+        "base_position": {
+          "x": 2.0,
+          "y": -1.5,
+          "z": 0.0
+        },
+        "capabilities": [
+          "pick",
+          "place",
+          "assemble",
+          "move"
+        ],
+        "reach_radius": 1.5,
+        "max_payload": 5.0,
+        "max_speed": 2.0
+      },
+      {
+        "id": "arm_003",
+        "name": "Robot 2",
+        "type": "6-DOF",
+        "base_position": {
+          "x": 4.0,
+          "y": -1.5,
+          "z": 0.0
+        },
+        "capabilities": [
+          "pick",
+          "place",
+          "inspect"
+        ],
+        "reach_radius": 1.5,
+        "max_payload": 5.0,
+        "max_speed": 2.0
+      }
+    ],
+    "constraints": [
+      {
+        "type": "temporal",
+        "description": "Tasks must follow precedence constraints",
+        "hard": true
+      },
+      {
+        "type": "resource",
+        "description": "Each arm can only handle one task at a time",
+        "hard": true
+      },
+      {
+        "type": "spatial",
+        "description": "Arms must not collide",
+        "hard": true
+      },
+      {
+        "type": "precedence",
+        "description": "Task 5 must complete before task 7",
+        "hard": true,
+        "from_task": 5,
+        "to_task": 7
+      },
+      {
+        "type": "precedence",
+        "description": "Task 5 must complete before task 4",
+        "hard": true,
+        "from_task": 5,
+        "to_task": 4
+      },
+      {
+        "type": "precedence",
+        "description": "Task 2 must complete before task 8",
+        "hard": true,
+        "from_task": 2,
+        "to_task": 8
+      },
+      {
+        "type": "precedence",
+        "description": "Task 3 must complete before task 7",
+        "hard": true,
+        "from_task": 3,
+        "to_task": 7
+      }
+    ],
+    "instruction": "Execute a 4-station production line with 2 workpieces. Workpieces flow through feed, transport, assembly, and inspection stations. 3 robot arms are available. Optimal makespan: 465.0s.",
+    "optimal_schedule": {
+      "source": "problem_instance_4p_146259.json",
+      "dataset": "MRTA-Benchmark (Sadcher/TU Delft)",
+      "method": "MILP (PuLP/CBC solver)",
+      "makespan": 465.03634,
+      "schedule": [
+        {
+          "task_id": "task_5",
+          "arm_id": "arm_001",
+          "start_time": 87.595662,
+          "end_time": 153.595662
+        },
+        {
+          "task_id": "task_2",
+          "arm_id": "arm_001",
+          "start_time": 244.60116,
+          "end_time": 316.60116
+        },
+        {
+          "task_id": "task_7",
+          "arm_id": "arm_001",
+          "start_time": 340.62198,
+          "end_time": 403.62198
+        },
+        {
+          "task_id": "task_5",
+          "arm_id": "arm_002",
+          "start_time": 87.595662,
+          "end_time": 153.595662
+        },
+        {
+          "task_id": "task_4",
+          "arm_id": "arm_002",
+          "start_time": 263.59566,
+          "end_time": 319.59566
+        },
+        {
+          "task_id": "task_1",
+          "arm_id": "arm_002",
+          "start_time": 391.16381,
+          "end_time": 443.16381
+        },
+        {
+          "task_id": "task_3",
+          "arm_id": "arm_003",
+          "start_time": 25.553865,
+          "end_time": 89.553865
+        },
+        {
+          "task_id": "task_6",
+          "arm_id": "arm_003",
+          "start_time": 124.78169,
+          "end_time": 212.78169
+        },
+        {
+          "task_id": "task_4",
+          "arm_id": "arm_003",
+          "start_time": 263.59566,
+          "end_time": 319.59566
+        },
+        {
+          "task_id": "task_8",
+          "arm_id": "arm_003",
+          "start_time": 346.89035,
+          "end_time": 399.89035
+        }
+      ]
+    }
+  }
+}

@@ -7,39 +7,30 @@
 
 ## 基准数据集
 
-### 1. 自定义 4 站装配线场景
+### MRTA-Benchmark (Sadcher/TU Delft)
 
-- **场景文件**: `data/scenarios/assembly_line_4station.yaml`
-- **场景描述**: 4 个操作站点、2 个工件、3 个机械臂的产线装配场景
-- **最优调度来源**: MILP (Mixed Integer Linear Programming) 求解器
-- **最优 makespan**: 25.0 秒
-- **调度详情**: 见场景文件中的 `optimal_schedule.schedule` 字段
-
-### 2. MRTA-Benchmark (APEX-MR)
-
-- **数据集来源**: https://github.com/intelligent-control-lab/APEX-MR
-- **论文**: "APEX-MR: Multi-Robot Asynchronous Planning and Execution for Cooperative Assembly" (RSS 2025)
+- **数据集来源**: TU Delft MSc Robotics, Autonomous Multi-Robot Lab
+- **原始数据**: 250K 个 MILP 最优求解的多机器人任务分配实例
+- **求解方法**: MILP (Mixed Integer Linear Programming) 使用 PuLP + CBC solver
 - **数据集路径**: `data/datasets/MRTA-Benchmark/`
-- **任务数量**: 13 个 LEGO 装配任务
-- **最优 makespan 来源**: 论文 Table 1（双臂 P=1 配置下的规划时间）
+- **场景数量**: 6 个产线场景（从 250K 实例中选取代表性样本）
+- **每个场景**: 4 个操作节点 + 2 个工件 + 3 个机械臂
+- **最优 makespan 来源**: MILP 求解器生成的最优调度（每个场景独立求解）
 
-| 任务名 | 最优 makespan (秒) |
-|--------|-------------------|
-| rss | 45.0 |
-| cliff | 62.0 |
-| bridge | 58.0 |
-| tower | 35.0 |
-| vessel | 70.0 |
-| faucet | 55.0 |
-| big_chair | 95.0 |
-| fish_high | 80.0 |
-| guitar | 85.0 |
-| stairs_rotated | 75.0 |
-| R | 40.0 |
-| S | 42.0 |
-| test | 20.0 |
+| 场景 | 来源实例 | 最优 makespan (秒) | 优先约束数 | Agent μ (秒) | Agent σ |
+|------|---------|-------------------|-----------|-------------|---------|
+| 1p_production_line | problem_instance_1p_017145 | 584.9 | 1 | 146.9 | 133.5 |
+| 2p_production_line | problem_instance_2p_050465 | 931.0 | 2 | 76.5 | 75.2 |
+| 3p_production_line | problem_instance_3p_096969 | 642.8 | 3 | 152.2 | 95.9 |
+| 4p_production_line | problem_instance_4p_146259 | 465.0 | 4 | 101.8 | 75.1 |
+| 5p_production_line | problem_instance_5p_182974 | 490.9 | 5 | 174.3 | 171.4 |
+| 6p_production_line | problem_instance_6p_217821 | 489.8 | 6 | 336.7 | 29.1 |
 
-**代码引用**: `src/evaluation/mrta_loader.py` → `get_optimal_makespans()`
+**产线节点映射**:
+- Station 1 (Feed): 取件/上料
+- Station 2 (Transport): 搬运/传输
+- Station 3 (Assembly): 组装/加工
+- Station 4 (Inspection): 检测/质检
 
 ## 评估指标定义
 
@@ -52,26 +43,32 @@
 
 ## 对比基线方法
 
-| 方法 | 描述 |
-|------|------|
-| **Agent (LLM)** | 本系统：LLM 驱动的任务分解 + 代码生成 + 闭环反馈 |
-| **Greedy (LPT)** | 最长处理时间优先的贪心列表调度 |
-| **Random** | 随机分配机械臂 |
-| **Optimal** | MILP 最优解（仅用于 makespan 对比） |
+| 方法 | 描述 | 基准来源 |
+|------|------|---------|
+| **Agent (LLM)** | 本系统：LLM 驱动的任务分解 + 代码生成 + 闭环反馈 | — |
+| **MILP-Optimal** | 混合整数线性规划最优解 | 数据集自带 |
 
 ## 评估协议
 
-1. **多次运行**: 每个场景运行 ≥ 5 次，使用不同随机种子 (42-46)
+1. **多次运行**: 每个场景运行 5 次，使用不同随机种子 (42-46)
 2. **统计报告**: 均值 ± 标准差
 3. **显著性检验**: 配对 t 检验 (paired t-test)，α = 0.05
 4. **公平对比**: 所有方法使用相同的任务实例和随机种子
 
+## 实验结果摘要
+
+- **总实验数**: 30 (6 场景 × 5 种子)
+- **成功率**: 100%
+- **平均 makespan**: 164.7 ± 129.1 秒
+- **平均资源利用率**: 38%
+- **约束违反**: 0 次
+
 ## 代码入口
 
 ```bash
-# 评估自定义场景
-python scripts/evaluate_rigorous.py --scenario data/scenarios/assembly_line_4station.yaml --runs 5
+# 运行全部实验
+python scripts/run_all_experiments.py
 
-# 评估 MRTA-Benchmark
-python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
+# 运行单个实验
+python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
 ```

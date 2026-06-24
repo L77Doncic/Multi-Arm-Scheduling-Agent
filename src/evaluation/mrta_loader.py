@@ -23,8 +23,8 @@ Usage:
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -57,27 +57,29 @@ OPERATION_TYPES = {
 @dataclass
 class APEXBrick:
     """A single brick placement from the APEX-MR dataset."""
-    brick_seq: int          # Order in assembly sequence
-    brick_id: int           # Brick type ID
-    x: int                  # Grid X position
-    y: int                  # Grid Y position
-    z: int                  # Grid Z (layer)
-    ori: int                # Orientation (0-3)
-    press_side: int         # Side to press from
-    press_offset: int       # Press offset
-    manipulate_type: int    # 0=normal, 1=handover
-    attack_dir: int         # Approach direction
-    press_x: int            # Press target X
-    press_y: int            # Press target Y
-    press_z: int            # Press target Z
-    support_x: int          # Support brick X (-1 if base)
-    support_y: int          # Support brick Y
-    support_z: int          # Support brick Z
+
+    brick_seq: int  # Order in assembly sequence
+    brick_id: int  # Brick type ID
+    x: int  # Grid X position
+    y: int  # Grid Y position
+    z: int  # Grid Z (layer)
+    ori: int  # Orientation (0-3)
+    press_side: int  # Side to press from
+    press_offset: int  # Press offset
+    manipulate_type: int  # 0=normal, 1=handover
+    attack_dir: int  # Approach direction
+    press_x: int  # Press target X
+    press_y: int  # Press target Y
+    press_z: int  # Press target Z
+    support_x: int  # Support brick X (-1 if base)
+    support_y: int  # Support brick Y
+    support_z: int  # Support brick Z
 
 
 @dataclass
 class MRTATask:
     """A task scenario from the MRTA-Benchmark."""
+
     task_id: str
     name: str
     bricks: List[APEXBrick]
@@ -126,7 +128,7 @@ class MRTABenchmarkLoader:
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Task file not found: {filepath}")
 
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             raw_data = json.load(f)
 
         bricks = self._parse_bricks(raw_data)
@@ -134,21 +136,25 @@ class MRTABenchmarkLoader:
 
         task = MRTATask(
             task_id=task_name,
-            name=task_name.replace('_', ' ').title(),
+            name=task_name.replace("_", " ").title(),
             bricks=bricks,
             num_bricks=len(bricks),
             assembly_layers=layers,
         )
 
-        logger.info("Loaded task '%s': %d bricks, %d layers",
-                     task_name, len(bricks), len(layers))
+        logger.info(
+            "Loaded task '%s': %d bricks, %d layers",
+            task_name,
+            len(bricks),
+            len(layers),
+        )
         return task
 
     def load_all(self) -> List[MRTATask]:
         """Load all tasks from the data directory."""
         tasks = []
         for filename in sorted(os.listdir(self.data_dir)):
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 task_name = filename[:-5]  # Remove .json
                 try:
                     tasks.append(self.load_task(task_name))
@@ -162,12 +168,13 @@ class MRTABenchmarkLoader:
         """List available task names."""
         tasks = []
         for filename in sorted(os.listdir(self.data_dir)):
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 tasks.append(filename[:-5])
         return tasks
 
-    def task_to_scenario_config(self, task: MRTATask,
-                                 num_arms: int = 2) -> Dict[str, Any]:
+    def task_to_scenario_config(
+        self, task: MRTATask, num_arms: int = 2
+    ) -> Dict[str, Any]:
         """
         Convert an APEX-MR task into our scenario config format.
 
@@ -188,16 +195,20 @@ class MRTABenchmarkLoader:
         }
 
         for sid, pos in station_positions.items():
-            stations.append({
-                "id": sid,
-                "name": sid.replace('_', ' ').title(),
-                "position": pos,
-                "capabilities_required": ["pick", "place"] if sid != "inspection" else ["inspect"],
-                "operation": f"{sid}_operation",
-                "estimated_duration": 3.0,
-                "predecessors": [],
-                "successors": [],
-            })
+            stations.append(
+                {
+                    "id": sid,
+                    "name": sid.replace("_", " ").title(),
+                    "position": pos,
+                    "capabilities_required": (
+                        ["pick", "place"] if sid != "inspection" else ["inspect"]
+                    ),
+                    "operation": f"{sid}_operation",
+                    "estimated_duration": 3.0,
+                    "predecessors": [],
+                    "successors": [],
+                }
+            )
 
         # Create tasks for each brick
         for brick in task.bricks:
@@ -205,21 +216,25 @@ class MRTABenchmarkLoader:
 
             # Pick task
             pick_id = f"pick_{brick_name}"
-            tasks.append({
-                "id": pick_id,
-                "name": f"Pick {brick_name}",
-                "operation_type": "pick",
-                "station_id": "brick_feed",
-                "workpiece_id": brick_name,
-                "required_capabilities": ["pick", "gripper"],
-                "estimated_duration": 2.0,
-                "dependencies": [],
-                "parameters": {
-                    "brick_id": brick.brick_id,
-                    "brick_type": BRICK_TYPES.get(brick.brick_id, {}).get("name", "unknown"),
-                    "position": {"x": brick.x, "y": brick.y, "z": brick.z},
-                },
-            })
+            tasks.append(
+                {
+                    "id": pick_id,
+                    "name": f"Pick {brick_name}",
+                    "operation_type": "pick",
+                    "station_id": "brick_feed",
+                    "workpiece_id": brick_name,
+                    "required_capabilities": ["pick", "gripper"],
+                    "estimated_duration": 2.0,
+                    "dependencies": [],
+                    "parameters": {
+                        "brick_id": brick.brick_id,
+                        "brick_type": BRICK_TYPES.get(brick.brick_id, {}).get(
+                            "name", "unknown"
+                        ),
+                        "position": {"x": brick.x, "y": brick.y, "z": brick.z},
+                    },
+                }
+            )
 
             # Place task
             place_id = f"place_{brick_name}"
@@ -230,53 +245,63 @@ class MRTABenchmarkLoader:
                 if support_seq:
                     place_deps.append(f"place_brick_{support_seq}")
 
-            tasks.append({
-                "id": place_id,
-                "name": f"Place {brick_name}",
-                "operation_type": "place",
-                "station_id": "assembly_area",
-                "workpiece_id": brick_name,
-                "required_capabilities": ["place", "positioning"],
-                "estimated_duration": 3.0,
-                "dependencies": place_deps,
-                "parameters": {
-                    "position": {"x": brick.x, "y": brick.y, "z": brick.z},
-                    "orientation": brick.ori,
-                    "press_side": brick.press_side,
-                },
-            })
+            tasks.append(
+                {
+                    "id": place_id,
+                    "name": f"Place {brick_name}",
+                    "operation_type": "place",
+                    "station_id": "assembly_area",
+                    "workpiece_id": brick_name,
+                    "required_capabilities": ["place", "positioning"],
+                    "estimated_duration": 3.0,
+                    "dependencies": place_deps,
+                    "parameters": {
+                        "position": {"x": brick.x, "y": brick.y, "z": brick.z},
+                        "orientation": brick.ori,
+                        "press_side": brick.press_side,
+                    },
+                }
+            )
 
             # Press task (for assembly)
             press_id = f"press_{brick_name}"
-            tasks.append({
-                "id": press_id,
-                "name": f"Press {brick_name}",
-                "operation_type": "assemble",
-                "station_id": "assembly_area",
-                "workpiece_id": brick_name,
-                "required_capabilities": ["force_control", "positioning"],
-                "estimated_duration": 2.0,
-                "dependencies": [place_id],
-                "parameters": {
-                    "press_position": {"x": brick.press_x, "y": brick.press_y, "z": brick.press_z},
-                    "press_side": brick.press_side,
-                    "manipulate_type": brick.manipulate_type,
-                },
-            })
+            tasks.append(
+                {
+                    "id": press_id,
+                    "name": f"Press {brick_name}",
+                    "operation_type": "assemble",
+                    "station_id": "assembly_area",
+                    "workpiece_id": brick_name,
+                    "required_capabilities": ["force_control", "positioning"],
+                    "estimated_duration": 2.0,
+                    "dependencies": [place_id],
+                    "parameters": {
+                        "press_position": {
+                            "x": brick.press_x,
+                            "y": brick.press_y,
+                            "z": brick.press_z,
+                        },
+                        "press_side": brick.press_side,
+                        "manipulate_type": brick.manipulate_type,
+                    },
+                }
+            )
 
         # Create workpieces (one per brick)
         for brick in task.bricks:
             brick_name = f"brick_{brick.brick_seq}"
-            workpieces.append({
-                "id": brick_name,
-                "type": BRICK_TYPES.get(brick.brick_id, {}).get("name", "unknown"),
-                "operations_sequence": [
-                    f"pick_{brick_name}",
-                    f"place_{brick_name}",
-                    f"press_{brick_name}",
-                ],
-                "priority": brick.brick_seq,
-            })
+            workpieces.append(
+                {
+                    "id": brick_name,
+                    "type": BRICK_TYPES.get(brick.brick_id, {}).get("name", "unknown"),
+                    "operations_sequence": [
+                        f"pick_{brick_name}",
+                        f"place_{brick_name}",
+                        f"press_{brick_name}",
+                    ],
+                    "priority": brick.brick_seq,
+                }
+            )
 
         # Robot arms (dual-arm setup matching APEX-MR)
         robot_arms = [
@@ -284,26 +309,40 @@ class MRTABenchmarkLoader:
                 "id": "arm_1",
                 "name": "Left Arm",
                 "type": "6-DOF",
-                "capabilities": ["pick", "place", "gripper", "force_control", "positioning"],
+                "capabilities": [
+                    "pick",
+                    "place",
+                    "gripper",
+                    "force_control",
+                    "positioning",
+                ],
                 "base_position": {"x": -1.0, "y": -1.0, "z": 0.0},
             },
             {
                 "id": "arm_2",
                 "name": "Right Arm",
                 "type": "6-DOF",
-                "capabilities": ["pick", "place", "gripper", "force_control", "positioning"],
+                "capabilities": [
+                    "pick",
+                    "place",
+                    "gripper",
+                    "force_control",
+                    "positioning",
+                ],
                 "base_position": {"x": 1.0, "y": 1.0, "z": 0.0},
             },
         ]
 
         if num_arms >= 3:
-            robot_arms.append({
-                "id": "arm_3",
-                "name": "Inspection Arm",
-                "type": "4-DOF",
-                "capabilities": ["inspect", "vision", "pick"],
-                "base_position": {"x": 2.0, "y": -1.0, "z": 1.0},
-            })
+            robot_arms.append(
+                {
+                    "id": "arm_3",
+                    "name": "Inspection Arm",
+                    "type": "4-DOF",
+                    "capabilities": ["inspect", "vision", "pick"],
+                    "base_position": {"x": 2.0, "y": -1.0, "z": 1.0},
+                }
+            )
 
         # Build instruction
         brick_types_used = set()
@@ -328,9 +367,22 @@ class MRTABenchmarkLoader:
                 "robot_arms": robot_arms,
                 "tasks": tasks,
                 "constraints": [
-                    {"type": "temporal", "description": "Assembly sequence must be respected", "hard": True},
-                    {"type": "resource", "description": "One brick per arm at a time", "hard": True},
-                    {"type": "spatial", "description": "Arms must not collide", "hard": True, "min_separation": 0.3},
+                    {
+                        "type": "temporal",
+                        "description": "Assembly sequence must be respected",
+                        "hard": True,
+                    },
+                    {
+                        "type": "resource",
+                        "description": "One brick per arm at a time",
+                        "hard": True,
+                    },
+                    {
+                        "type": "spatial",
+                        "description": "Arms must not collide",
+                        "hard": True,
+                        "min_separation": 0.3,
+                    },
                 ],
                 "instruction": instruction,
                 "source": "APEX-MR",
@@ -349,24 +401,26 @@ class MRTABenchmarkLoader:
                 seq = int(key)
             except ValueError:
                 continue
-            bricks.append(APEXBrick(
-                brick_seq=seq,
-                brick_id=val.get("brick_id", 0),
-                x=val.get("x", 0),
-                y=val.get("y", 0),
-                z=val.get("z", 0),
-                ori=val.get("ori", 0),
-                press_side=val.get("press_side", 0),
-                press_offset=val.get("press_offset", 0),
-                manipulate_type=val.get("manipulate_type", 0),
-                attack_dir=val.get("attack_dir", 0),
-                press_x=val.get("press_x", 0),
-                press_y=val.get("press_y", 0),
-                press_z=val.get("press_z", 0),
-                support_x=val.get("support_x", -1),
-                support_y=val.get("support_y", -1),
-                support_z=val.get("support_z", 0),
-            ))
+            bricks.append(
+                APEXBrick(
+                    brick_seq=seq,
+                    brick_id=val.get("brick_id", 0),
+                    x=val.get("x", 0),
+                    y=val.get("y", 0),
+                    z=val.get("z", 0),
+                    ori=val.get("ori", 0),
+                    press_side=val.get("press_side", 0),
+                    press_offset=val.get("press_offset", 0),
+                    manipulate_type=val.get("manipulate_type", 0),
+                    attack_dir=val.get("attack_dir", 0),
+                    press_x=val.get("press_x", 0),
+                    press_y=val.get("press_y", 0),
+                    press_z=val.get("press_z", 0),
+                    support_x=val.get("support_x", -1),
+                    support_y=val.get("support_y", -1),
+                    support_z=val.get("support_z", 0),
+                )
+            )
         # Sort by assembly sequence
         bricks.sort(key=lambda b: b.brick_seq)
         return bricks
@@ -380,15 +434,18 @@ class MRTABenchmarkLoader:
             layers[brick.z].append(brick)
         return layers
 
-    def _find_support_brick_seq(self, bricks: List[APEXBrick],
-                                 brick: APEXBrick) -> Optional[int]:
+    def _find_support_brick_seq(
+        self, bricks: List[APEXBrick], brick: APEXBrick
+    ) -> Optional[int]:
         """Find the brick sequence number that supports the given brick."""
         if brick.support_z < 0:
             return None
         for b in bricks:
-            if (b.x == brick.support_x and
-                b.y == brick.support_y and
-                b.z == brick.support_z):
+            if (
+                b.x == brick.support_x
+                and b.y == brick.support_y
+                and b.z == brick.support_z
+            ):
                 return b.brick_seq
         return None
 
@@ -405,17 +462,17 @@ def get_optimal_makespans() -> Dict[str, float]:
     Source: Table 1 in https://arxiv.org/abs/2503.15836
     """
     return {
-        "rss": 45.0,           # RSS logo (paper's primary demo)
-        "cliff": 62.0,         # Cliff structure
-        "bridge": 58.0,        # Bridge structure
-        "tower": 35.0,         # Tower structure
-        "vessel": 70.0,        # Vessel structure
-        "faucet": 55.0,        # Faucet structure
-        "big_chair": 95.0,     # Large chair
-        "fish_high": 80.0,     # Fish structure
-        "guitar": 85.0,        # Guitar structure
-        "stairs_rotated": 75.0, # Rotated stairs
-        "R": 40.0,             # Letter R
-        "S": 42.0,             # Letter S
-        "test": 20.0,          # Simple test task
+        "rss": 45.0,  # RSS logo (paper's primary demo)
+        "cliff": 62.0,  # Cliff structure
+        "bridge": 58.0,  # Bridge structure
+        "tower": 35.0,  # Tower structure
+        "vessel": 70.0,  # Vessel structure
+        "faucet": 55.0,  # Faucet structure
+        "big_chair": 95.0,  # Large chair
+        "fish_high": 80.0,  # Fish structure
+        "guitar": 85.0,  # Guitar structure
+        "stairs_rotated": 75.0,  # Rotated stairs
+        "R": 40.0,  # Letter R
+        "S": 42.0,  # Letter S
+        "test": 20.0,  # Simple test task
     }

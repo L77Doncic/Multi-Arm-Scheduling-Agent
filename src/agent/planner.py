@@ -8,8 +8,8 @@ with dependency graphs, resource requirements, and scheduling constraints.
 import json
 import logging
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TaskNode:
     """A node in the task dependency graph."""
+
     id: str
     name: str
     description: str
@@ -32,6 +33,7 @@ class TaskNode:
 @dataclass
 class TaskPlan:
     """Complete task plan with dependency graph."""
+
     plan_id: str
     instruction: str
     tasks: List[TaskNode]
@@ -88,7 +90,9 @@ class TaskPlanner:
         self.plan_counter = 0
         logger.info("TaskPlanner initialized")
 
-    def create_plan(self, instruction: str, scene_config: Optional[Dict] = None) -> TaskPlan:
+    def create_plan(
+        self, instruction: str, scene_config: Optional[Dict] = None
+    ) -> TaskPlan:
         """
         Create a task plan from a natural language instruction.
 
@@ -108,36 +112,41 @@ class TaskPlanner:
         else:
             plan = self._plan_with_heuristics(plan_id, instruction, scene_config)
 
-        logger.info("Plan %s created with %d tasks, est. makespan=%.1f",
-                     plan_id, len(plan.tasks), plan.estimated_makespan)
+        logger.info(
+            "Plan %s created with %d tasks, est. makespan=%.1f",
+            plan_id,
+            len(plan.tasks),
+            plan.estimated_makespan,
+        )
         return plan
 
-    def _plan_with_llm(self, plan_id: str, instruction: str,
-                       scene_config: Optional[Dict]) -> TaskPlan:
+    def _plan_with_llm(
+        self, plan_id: str, instruction: str, scene_config: Optional[Dict]
+    ) -> TaskPlan:
         """Use LLM to create a task plan."""
         from .prompts.task_decomposition import task_decompose_prompt
 
         prompt = task_decompose_prompt(instruction, scene_config or {})
         try:
             response = self.llm_client.generate_structured(
-                prompt,
-                schema=self._get_plan_schema()
+                prompt, schema=self._get_plan_schema()
             )
             return self._parse_plan_response(plan_id, instruction, response)
         except Exception as e:
             logger.warning("LLM planning failed (%s), falling back to heuristics", e)
             return self._plan_with_heuristics(plan_id, instruction, scene_config)
 
-    def _plan_with_heuristics(self, plan_id: str, instruction: str,
-                              scene_config: Optional[Dict]) -> TaskPlan:
+    def _plan_with_heuristics(
+        self, plan_id: str, instruction: str, scene_config: Optional[Dict]
+    ) -> TaskPlan:
         """Create a task plan using heuristic rules (no LLM)."""
         tasks: List[TaskNode] = []
         instruction_lower = instruction.lower()
 
         # Extract stations and workpieces from scene config
-        stations = (scene_config or {}).get('stations', [])
-        workpieces = (scene_config or {}).get('workpieces', [])
-        arms = (scene_config or {}).get('robot_arms', [])
+        stations = (scene_config or {}).get("stations", [])
+        workpieces = (scene_config or {}).get("workpieces", [])
+        arms = (scene_config or {}).get("robot_arms", [])
 
         if stations and workpieces:
             tasks = self._plan_from_scene(stations, workpieces)
@@ -158,18 +167,19 @@ class TaskPlanner:
             tasks=tasks,
             dependency_graph=dep_graph,
             estimated_makespan=est_makespan,
-            metadata={'method': 'heuristic', 'num_stations': len(stations)}
+            metadata={"method": "heuristic", "num_stations": len(stations)},
         )
 
-    def _plan_from_scene(self, stations: List[Dict],
-                         workpieces: List[Dict]) -> List[TaskNode]:
+    def _plan_from_scene(
+        self, stations: List[Dict], workpieces: List[Dict]
+    ) -> List[TaskNode]:
         """Generate tasks from scene configuration."""
         tasks: List[TaskNode] = []
         task_counter = 0
 
         for wp in workpieces:
-            wp_id = wp.get('id', 'wp')
-            op_sequence = wp.get('operations_sequence', [])
+            wp_id = wp.get("id", "wp")
+            op_sequence = wp.get("operations_sequence", [])
             prev_task_id: Optional[str] = None
 
             for station_id in op_sequence:
@@ -177,13 +187,13 @@ class TaskPlanner:
                 task_id = f"t_{task_counter:03d}"
 
                 # Find station config
-                station = next((s for s in stations if s['id'] == station_id), None)
+                station = next((s for s in stations if s["id"] == station_id), None)
                 if not station:
                     continue
 
-                op_name = station.get('operation', station_id)
-                caps = station.get('capabilities_required', [])
-                duration = station.get('estimated_duration', 3.0)
+                op_name = station.get("operation", station_id)
+                caps = station.get("capabilities_required", [])
+                duration = station.get("estimated_duration", 3.0)
 
                 deps = [prev_task_id] if prev_task_id else []
 
@@ -197,7 +207,7 @@ class TaskPlanner:
                     required_capabilities=caps,
                     estimated_duration=duration,
                     dependencies=deps,
-                    priority=wp.get('priority', 1)
+                    priority=wp.get("priority", 1),
                 )
                 tasks.append(task)
                 prev_task_id = task_id
@@ -211,14 +221,18 @@ class TaskPlanner:
 
         # Operation patterns to detect
         patterns = {
-            'pick': (['pick', 'grab', 'grasp', 'take'], 2.0, ['pick']),
-            'place': (['place', 'put', 'set', 'drop'], 2.0, ['place']),
-            'move': (['move', 'transfer', 'transport', 'carry'], 3.0, ['move']),
-            'assemble': (['assemble', 'connect', 'attach', 'join'], 8.0, ['assemble', 'gripper']),
-            'inspect': (['inspect', 'check', 'verify', 'examine'], 5.0, ['inspect']),
-            'tighten': (['tighten', 'secure', 'bolt', 'screw'], 3.0, ['tighten']),
-            'weld': (['weld', 'solder', 'bond'], 6.0, ['weld']),
-            'package': (['package', 'pack', 'box', 'output'], 3.0, ['pick', 'place']),
+            "pick": (["pick", "grab", "grasp", "take"], 2.0, ["pick"]),
+            "place": (["place", "put", "set", "drop"], 2.0, ["place"]),
+            "move": (["move", "transfer", "transport", "carry"], 3.0, ["move"]),
+            "assemble": (
+                ["assemble", "connect", "attach", "join"],
+                8.0,
+                ["assemble", "gripper"],
+            ),
+            "inspect": (["inspect", "check", "verify", "examine"], 5.0, ["inspect"]),
+            "tighten": (["tighten", "secure", "bolt", "screw"], 3.0, ["tighten"]),
+            "weld": (["weld", "solder", "bond"], 6.0, ["weld"]),
+            "package": (["package", "pack", "box", "output"], 3.0, ["pick", "place"]),
         }
 
         prev_task_id: Optional[str] = None
@@ -228,15 +242,17 @@ class TaskPlanner:
                 task_id = f"t_{task_counter:03d}"
                 deps = [prev_task_id] if prev_task_id else []
 
-                tasks.append(TaskNode(
-                    id=task_id,
-                    name=f"{op_type}_operation",
-                    description=f"Execute {op_type} operation",
-                    operation_type=op_type,
-                    required_capabilities=caps,
-                    estimated_duration=duration,
-                    dependencies=deps,
-                ))
+                tasks.append(
+                    TaskNode(
+                        id=task_id,
+                        name=f"{op_type}_operation",
+                        description=f"Execute {op_type} operation",
+                        operation_type=op_type,
+                        required_capabilities=caps,
+                        estimated_duration=duration,
+                        dependencies=deps,
+                    )
+                )
                 prev_task_id = task_id
 
         return tasks
@@ -259,10 +275,15 @@ class TaskPlanner:
             if not task.dependencies:
                 earliest_end[task_id] = task.estimated_duration
             else:
-                max_dep_end = max(
-                    get_earliest_end(dep) for dep in task.dependencies
-                    if dep in task_map
-                ) if task.dependencies else 0.0
+                max_dep_end = (
+                    max(
+                        get_earliest_end(dep)
+                        for dep in task.dependencies
+                        if dep in task_map
+                    )
+                    if task.dependencies
+                    else 0.0
+                )
                 earliest_end[task_id] = max_dep_end + task.estimated_duration
             return earliest_end[task_id]
 
@@ -286,38 +307,43 @@ class TaskPlanner:
                             "description": {"type": "string"},
                             "operation_type": {"type": "string"},
                             "required_capabilities": {
-                                "type": "array", "items": {"type": "string"}
+                                "type": "array",
+                                "items": {"type": "string"},
                             },
                             "estimated_duration": {"type": "number"},
                             "dependencies": {
-                                "type": "array", "items": {"type": "string"}
+                                "type": "array",
+                                "items": {"type": "string"},
                             },
                             "station_id": {"type": "string"},
-                            "workpiece_id": {"type": "string"}
+                            "workpiece_id": {"type": "string"},
                         },
-                        "required": ["id", "name", "operation_type"]
-                    }
+                        "required": ["id", "name", "operation_type"],
+                    },
                 }
             },
-            "required": ["tasks"]
+            "required": ["tasks"],
         }
 
-    def _parse_plan_response(self, plan_id: str, instruction: str,
-                             response: Dict) -> TaskPlan:
+    def _parse_plan_response(
+        self, plan_id: str, instruction: str, response: Dict
+    ) -> TaskPlan:
         """Parse LLM response into a TaskPlan."""
         tasks = []
-        for t in response.get('tasks', []):
-            tasks.append(TaskNode(
-                id=t['id'],
-                name=t.get('name', t['id']),
-                description=t.get('description', ''),
-                operation_type=t.get('operation_type', 'unknown'),
-                station_id=t.get('station_id'),
-                workpiece_id=t.get('workpiece_id'),
-                required_capabilities=t.get('required_capabilities', []),
-                estimated_duration=t.get('estimated_duration', 3.0),
-                dependencies=t.get('dependencies', []),
-            ))
+        for t in response.get("tasks", []):
+            tasks.append(
+                TaskNode(
+                    id=t["id"],
+                    name=t.get("name", t["id"]),
+                    description=t.get("description", ""),
+                    operation_type=t.get("operation_type", "unknown"),
+                    station_id=t.get("station_id"),
+                    workpiece_id=t.get("workpiece_id"),
+                    required_capabilities=t.get("required_capabilities", []),
+                    estimated_duration=t.get("estimated_duration", 3.0),
+                    dependencies=t.get("dependencies", []),
+                )
+            )
 
         dep_graph = {t.id: list(t.dependencies) for t in tasks}
         est_makespan = self._estimate_makespan(tasks)
@@ -328,5 +354,5 @@ class TaskPlanner:
             tasks=tasks,
             dependency_graph=dep_graph,
             estimated_makespan=est_makespan,
-            metadata={'method': 'llm'}
+            metadata={"method": "llm"},
         )

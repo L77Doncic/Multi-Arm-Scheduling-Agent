@@ -49,6 +49,7 @@ DEFAULT_FAILURE_PROBS: Dict[str, float] = {
 @dataclass
 class TraceEntry:
     """Single entry in the execution trace."""
+
     timestamp: float
     arm_id: str
     action: Dict[str, Any]
@@ -143,7 +144,8 @@ class MockSimulator(SimulationInterface):
         arm = self._arms.get(arm_id)
         if arm is None:
             result = ActionResult(
-                success=False, duration=0.0,
+                success=False,
+                duration=0.0,
                 error_message=f"Unknown arm: {arm_id}",
             )
             self._record_trace(arm_id, action, result)
@@ -151,7 +153,8 @@ class MockSimulator(SimulationInterface):
 
         if action_type not in self._durations:
             result = ActionResult(
-                success=False, duration=0.0,
+                success=False,
+                duration=0.0,
                 error_message=f"Unknown action type: {action_type}",
             )
             self._record_trace(arm_id, action, result)
@@ -182,7 +185,9 @@ class MockSimulator(SimulationInterface):
             return result
 
         # Successful execution -- update state
-        result = self._execute_successful_action(arm, action, action_type, base_duration)
+        result = self._execute_successful_action(
+            arm, action, action_type, base_duration
+        )
         self._sim_time += base_duration
         self._record_trace(arm_id, action, result)
         return result
@@ -234,7 +239,9 @@ class MockSimulator(SimulationInterface):
 
     def _ensure_initialized(self) -> None:
         if not self._initialized:
-            raise RuntimeError("MockSimulator has not been initialized; call initialize() first")
+            raise RuntimeError(
+                "MockSimulator has not been initialized; call initialize() first"
+            )
 
     def _ensure_running(self) -> None:
         self._ensure_initialized()
@@ -296,7 +303,7 @@ class MockSimulator(SimulationInterface):
                 obj = self._objects[arm.held_object]
                 obj.status = ObjectStatus.PLACED
                 obj.held_by = None
-                if target:
+                if target and (target.get("x") is not None or target.get("y") is not None):
                     obj.position = Position(
                         x=target.get("x", obj.position.x),
                         y=target.get("y", obj.position.y),
@@ -331,8 +338,6 @@ class MockSimulator(SimulationInterface):
         return ActionResult(
             success=True,
             duration=duration,
-            position=Position(
-                x=arm.position.x, y=arm.position.y, z=arm.position.z
-            ),
+            position=Position(x=arm.position.x, y=arm.position.y, z=arm.position.z),
             sensor_data=sensor_data,
         )

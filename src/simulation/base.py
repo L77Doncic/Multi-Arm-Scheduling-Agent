@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ArmStatus(Enum):
     """Status of a robot arm."""
+
     IDLE = "idle"
     MOVING = "moving"
     EXECUTING = "executing"
@@ -24,6 +25,7 @@ class ArmStatus(Enum):
 
 class ObjectStatus(Enum):
     """Status of an object in the scene."""
+
     IDLE = "idle"
     GRASPED = "grasped"
     PLACED = "placed"
@@ -34,6 +36,7 @@ class ObjectStatus(Enum):
 @dataclass
 class Position:
     """3D position with optional orientation."""
+
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
@@ -42,18 +45,25 @@ class Position:
     yaw: float = 0.0
 
     def as_dict(self) -> Dict[str, float]:
-        return {"x": self.x, "y": self.y, "z": self.z,
-                "roll": self.roll, "pitch": self.pitch, "yaw": self.yaw}
+        return {
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "roll": self.roll,
+            "pitch": self.pitch,
+            "yaw": self.yaw,
+        }
 
     def distance_to(self, other: "Position") -> float:
-        return ((self.x - other.x) ** 2 +
-                (self.y - other.y) ** 2 +
-                (self.z - other.z) ** 2) ** 0.5
+        return (
+            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2
+        ) ** 0.5
 
 
 @dataclass
 class ArmState:
     """State of a single robot arm."""
+
     arm_id: str
     status: ArmStatus = ArmStatus.IDLE
     position: Position = field(default_factory=Position)
@@ -66,6 +76,7 @@ class ArmState:
 @dataclass
 class ObjectState:
     """State of an object in the simulation."""
+
     object_id: str
     object_type: str
     position: Position = field(default_factory=Position)
@@ -77,6 +88,7 @@ class ObjectState:
 @dataclass
 class ActionResult:
     """Result of executing an action in the simulation."""
+
     success: bool
     duration: float
     position: Optional[Position] = None
@@ -87,6 +99,7 @@ class ActionResult:
 @dataclass
 class SimulationState:
     """Complete state of the simulation at a point in time."""
+
     timestamp: float
     arm_states: Dict[str, ArmState] = field(default_factory=dict)
     object_states: Dict[str, ObjectState] = field(default_factory=dict)

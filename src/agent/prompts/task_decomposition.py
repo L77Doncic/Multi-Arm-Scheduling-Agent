@@ -129,10 +129,7 @@ with other tasks in the decomposition.
 
     @classmethod
     def get_decompose_prompt(
-        cls,
-        instruction: str,
-        robot_arms: str,
-        max_tasks: int = 20
+        cls, instruction: str, robot_arms: str, max_tasks: int = 20
     ) -> str:
         """
         Get the task decomposition prompt.
@@ -146,17 +143,11 @@ with other tasks in the decomposition.
             Formatted prompt string.
         """
         return cls.DECOMPOSE_TASK.format(
-            instruction=instruction,
-            robot_arms=robot_arms,
-            max_tasks=max_tasks
+            instruction=instruction, robot_arms=robot_arms, max_tasks=max_tasks
         )
 
     @classmethod
-    def get_validation_prompt(
-        cls,
-        instruction: str,
-        tasks: str
-    ) -> str:
+    def get_validation_prompt(cls, instruction: str, tasks: str) -> str:
         """
         Get the task validation prompt.
 
@@ -167,18 +158,10 @@ with other tasks in the decomposition.
         Returns:
             Formatted prompt string.
         """
-        return cls.VALIDATE_DECOMPOSITION.format(
-            instruction=instruction,
-            tasks=tasks
-        )
+        return cls.VALIDATE_DECOMPOSITION.format(instruction=instruction, tasks=tasks)
 
     @classmethod
-    def get_refine_prompt(
-        cls,
-        task: str,
-        context: str,
-        feedback: str
-    ) -> str:
+    def get_refine_prompt(cls, task: str, context: str, feedback: str) -> str:
         """
         Get the task refinement prompt.
 
@@ -190,29 +173,36 @@ with other tasks in the decomposition.
         Returns:
             Formatted prompt string.
         """
-        return cls.REFINE_TASK.format(
-            task=task,
-            context=context,
-            feedback=feedback
-        )
+        return cls.REFINE_TASK.format(task=task, context=context, feedback=feedback)
 
 
 # ------------------------------------------------------------------
 # Convenience functions (used by planner.py)
 # ------------------------------------------------------------------
 
+
 def task_decompose_prompt(instruction: str, scene_config: dict) -> str:
     """Build a task decomposition prompt from instruction and scene config."""
     import json
 
     arms = scene_config.get("robot_arms", [])
-    arms_desc = json.dumps(arms, indent=2, ensure_ascii=False) if arms else "No arms configured"
+    arms_desc = (
+        json.dumps(arms, indent=2, ensure_ascii=False) if arms else "No arms configured"
+    )
 
     stations = scene_config.get("stations", [])
-    stations_desc = json.dumps(stations, indent=2, ensure_ascii=False) if stations else "No stations configured"
+    stations_desc = (
+        json.dumps(stations, indent=2, ensure_ascii=False)
+        if stations
+        else "No stations configured"
+    )
 
     workpieces = scene_config.get("workpieces", [])
-    workpieces_desc = json.dumps(workpieces, indent=2, ensure_ascii=False) if workpieces else "No workpieces configured"
+    workpieces_desc = (
+        json.dumps(workpieces, indent=2, ensure_ascii=False)
+        if workpieces
+        else "No workpieces configured"
+    )
 
     prompt = f"""## Task Decomposition Request
 

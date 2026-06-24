@@ -6,12 +6,13 @@ This module defines the abstract interface for all LLM clients.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class MessageRole(Enum):
     """Message role enumeration."""
+
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -20,20 +21,19 @@ class MessageRole(Enum):
 @dataclass
 class LLMMessage:
     """Represents a message in the conversation."""
+
     role: MessageRole
     content: str
 
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary format."""
-        return {
-            "role": self.role.value,
-            "content": self.content
-        }
+        return {"role": self.role.value, "content": self.content}
 
 
 @dataclass
 class LLMResponse:
     """Represents a response from the LLM."""
+
     content: str
     model: str
     usage: Dict[str, int] = field(default_factory=dict)
@@ -43,17 +43,17 @@ class LLMResponse:
     @property
     def total_tokens(self) -> int:
         """Get total tokens used."""
-        return self.usage.get('total_tokens', 0)
+        return self.usage.get("total_tokens", 0)
 
     @property
     def prompt_tokens(self) -> int:
         """Get prompt tokens used."""
-        return self.usage.get('prompt_tokens', 0)
+        return self.usage.get("prompt_tokens", 0)
 
     @property
     def completion_tokens(self) -> int:
         """Get completion tokens used."""
-        return self.usage.get('completion_tokens', 0)
+        return self.usage.get("completion_tokens", 0)
 
 
 class BaseLLMClient(ABC):
@@ -73,10 +73,10 @@ class BaseLLMClient(ABC):
                    model settings, and other parameters.
         """
         self.config = config
-        self.model = config.get('model', 'default')
-        self.temperature = config.get('temperature', 0.7)
-        self.max_tokens = config.get('max_tokens', 4096)
-        self.top_p = config.get('top_p', 0.9)
+        self.model = config.get("model", "default")
+        self.temperature = config.get("temperature", 0.7)
+        self.max_tokens = config.get("max_tokens", 4096)
+        self.top_p = config.get("top_p", 0.9)
         self._total_cost = 0.0
         self._total_tokens = 0
 

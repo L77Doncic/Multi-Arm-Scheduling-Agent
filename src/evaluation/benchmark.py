@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # Protocols / minimal interfaces
 # ------------------------------------------------------------------
 
+
 class AgentProtocol(Protocol):
     """Minimal interface that an agent must satisfy to be benchmarked."""
 
@@ -42,9 +43,11 @@ class AgentProtocol(Protocol):
 # Data classes
 # ------------------------------------------------------------------
 
+
 @dataclass
 class Scenario:
     """A single benchmarking scenario."""
+
     instruction: str
     config: Dict[str, Any] = field(default_factory=dict)
     expected_result: Optional[Dict[str, Any]] = None
@@ -53,6 +56,7 @@ class Scenario:
 @dataclass
 class BenchmarkResult:
     """Result of running an agent over a set of scenarios."""
+
     scenarios: List[Scenario]
     metrics_list: List[EvaluationMetrics]
     aggregate_metrics: EvaluationMetrics
@@ -61,6 +65,7 @@ class BenchmarkResult:
 @dataclass
 class ComparisonReport:
     """Comparison of agent metrics against a baseline."""
+
     agent_metrics: EvaluationMetrics
     baseline_metrics: EvaluationMetrics
     improvements: Dict[str, float]
@@ -71,9 +76,11 @@ class ComparisonReport:
 # Schedule helpers
 # ------------------------------------------------------------------
 
+
 @dataclass
 class Schedule:
     """A simple schedule mapping tasks to (arm_id, start, end)."""
+
     assignments: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -97,6 +104,7 @@ def _execution_log_from_schedule(schedule: Schedule) -> ExecutionLog:
 # ------------------------------------------------------------------
 # Benchmark runner
 # ------------------------------------------------------------------
+
 
 class BenchmarkRunner:
     """
@@ -139,7 +147,12 @@ class BenchmarkRunner:
             json_files = sorted(path.glob("*.json"))
             for jf in json_files:
                 scenarios.extend(self._load_single_file(jf))
-            logger.info("Loaded %d scenarios from %d files in %s", len(scenarios), len(json_files), path)
+            logger.info(
+                "Loaded %d scenarios from %d files in %s",
+                len(scenarios),
+                len(json_files),
+                path,
+            )
         elif path.is_file():
             scenarios = self._load_single_file(path)
             logger.info("Loaded %d scenarios from %s", len(scenarios), path)
@@ -216,7 +229,9 @@ class BenchmarkRunner:
             aggregate_metrics=aggregate,
         )
 
-    def _aggregate_metrics(self, metrics_list: List[EvaluationMetrics]) -> EvaluationMetrics:
+    def _aggregate_metrics(
+        self, metrics_list: List[EvaluationMetrics]
+    ) -> EvaluationMetrics:
         if not metrics_list:
             return EvaluationMetrics(0, 0, 0, 0, 0, 0, 0)
         n = len(metrics_list)
@@ -250,7 +265,9 @@ class BenchmarkRunner:
         am = results.aggregate_metrics
         bm = baseline.aggregate_metrics
 
-        def _pct_change(agent_val: float, base_val: float, lower_is_better: bool) -> float:
+        def _pct_change(
+            agent_val: float, base_val: float, lower_is_better: bool
+        ) -> float:
             if base_val == 0:
                 return 0.0
             diff = (base_val - agent_val) if lower_is_better else (agent_val - base_val)
@@ -258,8 +275,12 @@ class BenchmarkRunner:
 
         improvements = {
             "makespan": _pct_change(am.makespan, bm.makespan, lower_is_better=True),
-            "task_success_rate": _pct_change(am.task_success_rate, bm.task_success_rate, lower_is_better=False),
-            "resource_utilization": _pct_change(am.resource_utilization, bm.resource_utilization, lower_is_better=False),
+            "task_success_rate": _pct_change(
+                am.task_success_rate, bm.task_success_rate, lower_is_better=False
+            ),
+            "resource_utilization": _pct_change(
+                am.resource_utilization, bm.resource_utilization, lower_is_better=False
+            ),
             "constraint_violations": _pct_change(
                 float(am.constraint_violations),
                 float(bm.constraint_violations),
@@ -268,7 +289,9 @@ class BenchmarkRunner:
         }
 
         # Simple paired t-test placeholder (requires scipy for real use)
-        significance = self._compute_significance(results.metrics_list, baseline.metrics_list)
+        significance = self._compute_significance(
+            results.metrics_list, baseline.metrics_list
+        )
 
         return ComparisonReport(
             agent_metrics=am,
@@ -367,7 +390,9 @@ class BenchmarkRunner:
         schedules: List[Schedule] = []
         for scenario in scenarios:
             schedules.append(generator(scenario))
-        logger.info("Generated %d baseline schedules using '%s'", len(schedules), method)
+        logger.info(
+            "Generated %d baseline schedules using '%s'", len(schedules), method
+        )
         return schedules
 
     # -- random baseline --------------------------------------------------
@@ -383,13 +408,15 @@ class BenchmarkRunner:
         for t in range(num_tasks):
             arm_id = f"arm_{self._rng.randint(0, num_arms - 1)}"
             dur = task_duration * self._rng.uniform(0.5, 1.5)
-            assignments.append({
-                "task_id": f"task_{t}",
-                "arm_id": arm_id,
-                "start_time": time,
-                "end_time": time + dur,
-                "status": "completed",
-            })
+            assignments.append(
+                {
+                    "task_id": f"task_{t}",
+                    "arm_id": arm_id,
+                    "start_time": time,
+                    "end_time": time + dur,
+                    "status": "completed",
+                }
+            )
             time += dur * 0.5  # some overlap potential
         return Schedule(assignments=assignments)
 
@@ -408,13 +435,15 @@ class BenchmarkRunner:
             arm_idx = min(range(num_arms), key=lambda i: arm_free_at[i])
             start = arm_free_at[arm_idx]
             end = start + task_duration
-            assignments.append({
-                "task_id": f"task_{t}",
-                "arm_id": f"arm_{arm_idx}",
-                "start_time": start,
-                "end_time": end,
-                "status": "completed",
-            })
+            assignments.append(
+                {
+                    "task_id": f"task_{t}",
+                    "arm_id": f"arm_{arm_idx}",
+                    "start_time": start,
+                    "end_time": end,
+                    "status": "completed",
+                }
+            )
             arm_free_at[arm_idx] = end
         return Schedule(assignments=assignments)
 
@@ -453,7 +482,7 @@ class BenchmarkRunner:
         for _ in range(generations):
             scored = [(c, _fitness(c)) for c in population]
             scored.sort(key=lambda x: x[1], reverse=True)
-            survivors = [c for c, _ in scored[:pop_size // 2]]
+            survivors = [c for c, _ in scored[: pop_size // 2]]
             children: List[List[int]] = []
             while len(children) < pop_size - len(survivors):
                 p1, p2 = self._rng.sample(survivors, 2)
@@ -469,12 +498,14 @@ class BenchmarkRunner:
         for t, arm_idx in enumerate(best):
             start = arm_free[arm_idx]
             end = start + task_duration
-            assignments.append({
-                "task_id": f"task_{t}",
-                "arm_id": f"arm_{arm_idx}",
-                "start_time": start,
-                "end_time": end,
-                "status": "completed",
-            })
+            assignments.append(
+                {
+                    "task_id": f"task_{t}",
+                    "arm_id": f"arm_{arm_idx}",
+                    "start_time": start,
+                    "end_time": end,
+                    "status": "completed",
+                }
+            )
             arm_free[arm_idx] = end
         return Schedule(assignments=assignments)

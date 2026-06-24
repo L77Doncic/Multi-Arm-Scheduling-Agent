@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 # Data classes
 # ------------------------------------------------------------------
 
+
 class TaskEntryStatus(Enum):
     """Status of a task entry in the execution log."""
+
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -29,6 +31,7 @@ class TaskEntryStatus(Enum):
 @dataclass
 class TaskEntry:
     """Single task record in an execution log."""
+
     task_id: str
     arm_id: str
     start_time: float
@@ -40,6 +43,7 @@ class TaskEntry:
 @dataclass
 class ExecutionLog:
     """Ordered collection of task entries produced during a run."""
+
     entries: List[TaskEntry] = field(default_factory=list)
 
     def add_entry(self, entry: TaskEntry) -> None:
@@ -55,6 +59,7 @@ class ExecutionLog:
 @dataclass
 class EvaluationMetrics:
     """Aggregate evaluation metrics for a single run or a summary."""
+
     makespan: float
     task_success_rate: float
     resource_utilization: float
@@ -67,6 +72,7 @@ class EvaluationMetrics:
 # ------------------------------------------------------------------
 # Calculator
 # ------------------------------------------------------------------
+
 
 class MetricsCalculator:
     """
@@ -87,7 +93,9 @@ class MetricsCalculator:
         earliest = min(e.start_time for e in execution_log.entries)
         latest = max(e.end_time for e in execution_log.entries)
         makespan = latest - earliest
-        logger.debug("Makespan: %.4f (earliest=%.4f, latest=%.4f)", makespan, earliest, latest)
+        logger.debug(
+            "Makespan: %.4f (earliest=%.4f, latest=%.4f)", makespan, earliest, latest
+        )
         return makespan
 
     def calculate_task_success_rate(self, execution_log: ExecutionLog) -> float:
@@ -99,11 +107,14 @@ class MetricsCalculator:
         if not execution_log.entries:
             return 1.0
         completed = sum(
-            1 for e in execution_log.entries
+            1
+            for e in execution_log.entries
             if e.status == TaskEntryStatus.COMPLETED.value or e.status == "completed"
         )
         rate = completed / len(execution_log.entries)
-        logger.debug("Task success rate: %.4f (%d / %d)", rate, completed, len(execution_log))
+        logger.debug(
+            "Task success rate: %.4f (%d / %d)", rate, completed, len(execution_log)
+        )
         return rate
 
     def calculate_resource_utilization(
@@ -121,7 +132,8 @@ class MetricsCalculator:
             return 0.0
 
         total_busy = sum(
-            e.end_time - e.start_time for e in execution_log.entries
+            e.end_time - e.start_time
+            for e in execution_log.entries
             if e.end_time > e.start_time
         )
         utilization = total_busy / (makespan * num_arms)
@@ -181,11 +193,13 @@ class MetricsCalculator:
 
         total = len(execution_log.entries)
         completed = sum(
-            1 for e in execution_log.entries
+            1
+            for e in execution_log.entries
             if e.status == TaskEntryStatus.COMPLETED.value or e.status == "completed"
         )
         failed = sum(
-            1 for e in execution_log.entries
+            1
+            for e in execution_log.entries
             if e.status == TaskEntryStatus.FAILED.value or e.status == "failed"
         )
 

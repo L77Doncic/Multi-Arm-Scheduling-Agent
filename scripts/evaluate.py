@@ -73,9 +73,13 @@ def load_benchmark_dataset(dataset_path: str) -> list:
 
 
 def load_scenario_as_benchmark(scenario_path: str) -> dict:
-    """Convert a scenario YAML to benchmark format."""
+    """Convert a scenario YAML/JSON to benchmark format."""
     with open(scenario_path, 'r') as f:
-        config = yaml.safe_load(f)
+        if scenario_path.endswith('.json'):
+            import json
+            config = json.load(f)
+        else:
+            config = yaml.safe_load(f)
 
     scenario = config.get('scenario', config)
     return {

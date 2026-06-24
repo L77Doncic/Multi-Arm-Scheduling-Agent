@@ -9,11 +9,7 @@ matching the pattern used by :class:`IsaacSimInterface`.
 import logging
 from typing import Any, Dict, Optional
 
-from simulation.base import (
-    ActionResult,
-    SimulationInterface,
-    SimulationState,
-)
+from simulation.base import ActionResult, SimulationInterface, SimulationState
 from simulation.mock_simulator import MockSimulator
 
 logger = logging.getLogger(__name__)
@@ -22,6 +18,7 @@ logger = logging.getLogger(__name__)
 try:
     import omni.kit  # type: ignore[import-untyped]
     import omni.usd  # type: ignore[import-untyped]
+
     _OMNIVERSE_AVAILABLE = True
 except ImportError:
     _OMNIVERSE_AVAILABLE = False
@@ -56,9 +53,7 @@ class OmniverseInterface(SimulationInterface):
             kwargs = mock_kwargs or {}
             self._mock = MockSimulator(**kwargs)
             self._use_mock = True
-            logger.warning(
-                "Omniverse not installed -- falling back to MockSimulator"
-            )
+            logger.warning("Omniverse not installed -- falling back to MockSimulator")
         else:
             raise ImportError(
                 "omni.kit is required but not installed. "
@@ -97,6 +92,7 @@ class OmniverseInterface(SimulationInterface):
             return self._mock.execute_action(arm_id, action)
 
         import time
+
         start = time.monotonic()
         action_type = action.get("type", "unknown")
 
@@ -126,6 +122,7 @@ class OmniverseInterface(SimulationInterface):
             return self._mock.get_state()
 
         import time
+
         # Real implementation would read USD prims and return their poses
         return SimulationState(
             timestamp=time.monotonic(),

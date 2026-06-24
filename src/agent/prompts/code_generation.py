@@ -188,7 +188,7 @@ Please validate this code against the task specification.
         task_spec: str,
         arm_config: str,
         skill_primitives: str,
-        safety_constraints: str
+        safety_constraints: str,
     ) -> str:
         """
         Get the code generation prompt.
@@ -206,7 +206,7 @@ Please validate this code against the task specification.
             task_spec=task_spec,
             arm_config=arm_config,
             skill_primitives=skill_primitives,
-            safety_constraints=safety_constraints
+            safety_constraints=safety_constraints,
         )
 
     @classmethod
@@ -216,7 +216,7 @@ Please validate this code against the task specification.
         skill_description: str,
         input_parameters: str,
         expected_behavior: str,
-        error_conditions: str
+        error_conditions: str,
     ) -> str:
         """
         Get the skill primitive generation prompt.
@@ -236,15 +236,12 @@ Please validate this code against the task specification.
             skill_description=skill_description,
             input_parameters=input_parameters,
             expected_behavior=expected_behavior,
-            error_conditions=error_conditions
+            error_conditions=error_conditions,
         )
 
     @classmethod
     def get_optimization_prompt(
-        cls,
-        current_code: str,
-        performance_metrics: str,
-        optimization_goals: str
+        cls, current_code: str, performance_metrics: str, optimization_goals: str
     ) -> str:
         """
         Get the code optimization prompt.
@@ -260,15 +257,12 @@ Please validate this code against the task specification.
         return cls.OPTIMIZE_CODE.format(
             current_code=current_code,
             performance_metrics=performance_metrics,
-            optimization_goals=optimization_goals
+            optimization_goals=optimization_goals,
         )
 
     @classmethod
     def get_validation_prompt(
-        cls,
-        code: str,
-        task_spec: str,
-        validation_criteria: str
+        cls, code: str, task_spec: str, validation_criteria: str
     ) -> str:
         """
         Get the code validation prompt.
@@ -282,9 +276,7 @@ Please validate this code against the task specification.
             Formatted prompt string.
         """
         return cls.VALIDATE_CODE.format(
-            code=code,
-            task_spec=task_spec,
-            validation_criteria=validation_criteria
+            code=code, task_spec=task_spec, validation_criteria=validation_criteria
         )
 
 
@@ -306,21 +298,27 @@ def code_generate_prompt(
 ) -> str:
     """Build a code generation prompt for a single task."""
 
-    task_spec = _json.dumps({
-        "name": task_name,
-        "description": task_description,
-        "operation_type": operation_type,
-        "parameters": parameters,
-    }, indent=2, ensure_ascii=False)
-
-    arm_config = _json.dumps({
-        "arm_id": arm_id,
-        "capabilities": capabilities,
-    }, indent=2, ensure_ascii=False)
-
-    primitives_desc = "\n".join(
-        f"  - {p}" for p in available_primitives
+    task_spec = _json.dumps(
+        {
+            "name": task_name,
+            "description": task_description,
+            "operation_type": operation_type,
+            "parameters": parameters,
+        },
+        indent=2,
+        ensure_ascii=False,
     )
+
+    arm_config = _json.dumps(
+        {
+            "arm_id": arm_id,
+            "capabilities": capabilities,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+    primitives_desc = "\n".join(f"  - {p}" for p in available_primitives)
 
     # Provide exact API signatures so the LLM generates correct calls
     api_signatures = """

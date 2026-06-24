@@ -41,9 +41,7 @@ def _resolve_class(dotted_path: str) -> type[LLMClient]:
     module = importlib.import_module(module_path)
     cls = getattr(module, class_name)
     if not (isinstance(cls, type) and issubclass(cls, LLMClient)):
-        raise TypeError(
-            f"{dotted_path!r} does not resolve to an LLMClient subclass."
-        )
+        raise TypeError(f"{dotted_path!r} does not resolve to an LLMClient subclass.")
     return cls
 
 
@@ -99,7 +97,9 @@ def create_llm_client(config: Dict[str, Any]) -> LLMClient:
     )
 
     class_path = _PROVIDER_REGISTRY[provider]
-    logger.info("Creating LLM client: provider=%s, model=%s", provider, llm_config.model)
+    logger.info(
+        "Creating LLM client: provider=%s, model=%s", provider, llm_config.model
+    )
 
     client_cls = _resolve_class(class_path)
     return client_cls(config=llm_config)
