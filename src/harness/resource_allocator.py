@@ -377,8 +377,7 @@ class ResourceAllocator:
         Calculate parallel opportunity score for assigning a task to an arm.
 
         Key insight: Tasks on DIFFERENT arms can run in parallel.
-        We want to DISTRIBUTE independent tasks across different arms,
-        not堆積 them on the same arm.
+        We want to DISTRIBUTE independent tasks across different arms.
 
         Returns a score in [0.0, 1.0] where higher means this assignment
         enables more parallel execution.
@@ -393,10 +392,6 @@ class ResourceAllocator:
             # First task overall - neutral
             return 0.5
 
-        if not other_arm_tasks:
-            # No tasks on other arms yet - this arm is the only option
-            return 0.5
-
         # Count how many tasks on OTHER arms this task can run in parallel with
         parallel_with_others = 0
         for other_tid in other_arm_tasks:
@@ -405,16 +400,18 @@ class ResourceAllocator:
                 task.id not in task_deps.get(other_tid, set())):
                 parallel_with_others += 1
 
-        # KEY LOGIC: If this task can run in parallel with tasks on OTHER arms,
-        # we should put it on THIS arm (different arm = parallel execution)
-        # Higher score = more parallel opportunities = better assignment
+        # KEY LOGIC: Prefer IDLE arms for parallel execution
+        # If this arm has fewer tasks, it's better for parallelism
+        arm_load_penalty = len(arm_tasks) / max(len(assignment), 1)
+
         if parallel_with_others > 0:
             # This task can run in parallel with tasks on other arms
-            # Putting it on THIS arm enables parallel execution
-            return min(1.0, parallel_with_others / len(other_arm_tasks))
+            # Prefer IDLE arms (lower load) for true parallel execution
+            base_score = min(1.0, parallel_with_others / max(len(other_arm_tasks), 1))
+            # Boost score for idle arms, penalize for busy arms
+            return base_score * (1.0 - arm_load_penalty * 0.5)
         else:
             # This task has dependencies with all tasks on other arms
-            # Must run after them - less parallel opportunity
             return 0.2
 
     def _match_capabilities(self, task: TaskInfo, arm: ArmInfo) -> float:
@@ -478,10 +475,16 @@ class ResourceAllocator:
             # Fallback: uniform duration
             duration_map = defaultdict(lambda: 1.0)
 
-        # Sum durations per arm
+        # Sum durations per arm - include ALL arms, not just those with tasks
         arm_totals: Dict[str, float] = defaultdict(float)
         for task_id, arm_id in assignment.items():
             arm_totals[arm_id] += duration_map.get(task_id, 1.0)
+
+        # Add arms with no tasks (load = 0)
+        if arm_infos is not None:
+            for arm in arm_infos:
+                if arm.id not in arm_totals:
+                    arm_totals[arm.id] = 0.0
 
         if len(arm_totals) < 2:
             return 1.0
