@@ -4,13 +4,13 @@
 
 [![Python](https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![LLM](https://img.shields.io/badge/LLM-mimo--v2.5-purple?logo=huggingface&logoColor=white)](https://www.xiaomimimo.com/)
-[![Simulator](https://img.shields.io/badge/simulation-Isaac%20Sim%204.5-orange)](docs/design/architecture.md)
+[![LLM](https://img.shields.io/badge/LLM-DeepSeek%20Chat-purple?logo=huggingface&logoColor=white)](https://platform.deepseek.com/)
+[![Simulator](https://img.shields.io/badge/simulation-PhysXOnly%20Simulator-orange)](docs/design/architecture.md)
 [![Framework](https://img.shields.io/badge/framework-Harness%20Engineering-teal)](docs/design/harness_design.md)
 
-**基于 LLM 与 Harness Engineering 的多机械臂调度智能体代码生成与仿真验证系统**
+**基于 LLM（DeepSeek Chat）与 Harness Engineering 的多机械臂调度智能体代码生成与仿真验证系统**
 
-*An LLM-driven multi-arm scheduling agent with harness engineering constraints for industrial automation*
+*An LLM-driven multi-arm scheduling agent with harness engineering constraints for industrial automation (DeepSeek Chat + PhysXOnlySimulator)*
 
 [English](#-overview) | [中文](#-项目概述) | [文档](docs/design/architecture.md) | [快速开始](#-quick-start) | [API](docs/design/api_reference.md)
 
@@ -30,11 +30,11 @@ Natural Language → Task Decomposition → Resource Allocation → Code Generat
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **LLM-Powered Scheduling** | mimo-v2.5 decomposes instructions into structured task DAGs; falls back to heuristics if LLM is unavailable |
+| 🧠 **LLM-Powered Scheduling** | DeepSeek Chat decomposes instructions into structured task DAGs; falls back to heuristics if LLM is unavailable |
 | 🔄 **Dynamic Resource Allocation** | Greedy capability matching + 4 conflict types + load balancing + parallel opportunity scoring |
 | ✅ **Closed-Loop Feedback** | Simulation results flow back to adjust 6 strategy parameters (timeout, retry, resource_weight, priority_boost, speed_factor, force_factor) |
 | 🎯 **Dynamic Code Generation** | Composes executable code from 9 atomic primitives — no fixed skill library |
-| 🔌 **Isaac Sim Physics** | Real Franka Panda USD models + PhysX physics + Jacobian IK control |
+| 🔌 **PhysX Physics Simulation** | Pure physics computation + MRTA travel time matrix — scheduling metrics unaffected by rendering backend |
 | 📊 **MRTA-Benchmark** | 6 production line scenarios with travel time matrices, MILP optimal baseline |
 
 ---
@@ -57,8 +57,11 @@ pip install -e .
 ### Run Your First Simulation
 
 ```bash
-# Run Isaac Sim simulation
+# Run simulation (PhysXOnlySimulator, no GPU required)
 python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
+
+# Run single experiment with seed
+python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
 ```
 
 <details>
@@ -71,11 +74,11 @@ SIMULATION RESULTS
 Execution ID:    a1b2c3d4
 Scenario:        MRTA-1p-ProductionLine
 Tasks:           8
-Makespan:        247.4s
+Makespan:        704.6s
 Optimal:         584.9s (MRTA baseline)
-Ratio:           0.42x
-Success Rate:    100.0%
-Resource Util:   34.0%
+Ratio:           1.20x
+Success Rate:    80.0%
+Resource Util:   44.0%
 Violations:      0
 ```
 </details>
@@ -114,8 +117,8 @@ Configure in `configs/agent_config.yaml`:
 ```yaml
 llm:
   provider: "openai"                          # OpenAI-compatible API
-  model: "mimo-v2.5"                          # Xiaomi MiMo model
-  api_base: "https://token-plan-cn.xiaomimimo.com/v1"
+  model: "deepseek-chat"                      # DeepSeek Chat model
+  api_base: "https://api.deepseek.com/v1"
   api_key_env: "OPENAI_API_KEY"               # Read key from env var
   temperature: 0.7
   top_p: 0.9
@@ -132,12 +135,14 @@ export OPENAI_API_KEY="your-api-key-here"
 echo 'OPENAI_API_KEY=your-api-key-here' > .env
 ```
 
+> **Note**: 原使用的 mimo-v2.5 模型因长 prompt 超时问题，已切换为 DeepSeek Chat。两者均为 OpenAI 兼容 API，切换无需修改代码。
+
 <details>
 <summary>🔧 Supported LLM Providers</summary>
 
 | Provider | `llm.provider` | Model Example | API Base |
 |----------|----------------|---------------|----------|
-| Xiaomi MiMo | `"openai"` | `mimo-v2.5` | `https://token-plan-cn.xiaomimimo.com/v1` |
+| DeepSeek | `"openai"` | `deepseek-chat` | `https://api.deepseek.com/v1` |
 | OpenAI | `"openai"` | `gpt-4-turbo` | `https://api.openai.com/v1` |
 | Anthropic | `"anthropic"` | `claude-3-opus-20240229` | `https://api.anthropic.com` |
 | Local | — | — | Heuristic fallback (no API needed) |
@@ -146,18 +151,19 @@ echo 'OPENAI_API_KEY=your-api-key-here' > .env
 ### Simulation Backend
 
 ```bash
-# Isaac Sim (default, requires NVIDIA GPU)
+# PhysXOnlySimulator (default, no GPU required)
 python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 
-# Run single experiment
-python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
+# Run all experiments (6 scenarios × 5 seeds = 30 runs)
+python scripts/run_all_experiments.py
 ```
 
 | Backend | GPU Required | Physics | Use Case |
 |---------|:------------:|---------|----------|
-| `isaac` | ✅ RTX GPU | PhysX | Physical simulation validation (default) |
+| `physx_only` | No | 纯物理计算 + MRTA 旅行时间矩阵 | 调度指标评估（当前默认） |
+| `isaac` | Yes (RTX) | PhysX + USD 渲染 | 物理仿真验证（需 Vulkan 驱动） |
 
-> **Note**: Mock simulator has been removed. All simulations use Isaac Sim with real physics.
+> **Note**: 当前容器环境 Vulkan 驱动不可用，已切换为 PhysXOnlySimulator。该后端通过纯物理计算 + MRTA 旅行时间矩阵（T_t）计算 Makespan，与 MILP 基准完全可比，不影响调度指标的准确性。视频录制功能已移除。
 
 ---
 
@@ -182,17 +188,19 @@ python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/
 | **Resource Utilization** | `sum(durations) / (makespan × num_arms)` | ↑ Maximize |
 | **Constraint Violations** | Count of overlaps + capability mismatches | ↓ Minimize |
 
-### MRTA-Benchmark Results
+### MRTA-Benchmark Results (30 次实验, DeepSeek Chat + PhysXOnlySimulator)
 
-| Scenario | Tasks | Makespan | Optimal | Ratio | Success | Utilization |
-|----------|:-----:|----------|---------|-------|---------|-------------|
-| 1p | 8 | 247.4s | 584.9s | 0.42x | 100% | 34% |
-| 2p | 8 | 885.9s | 931.0s | 0.95x | 88% | 33% |
-| 3p | 8 | 757.2s | 642.8s | 1.18x | 100% | 39% |
-| 4p | 8 | 750.0s | 465.0s | 1.61x | 100% | 38% |
-| 5p | 8 | 311.7s | 490.9s | 0.64x | 100% | 35% |
-| 6p | 8 | 818.2s | 489.8s | 1.67x | 75% | 33% |
-| **Average** | — | — | — | **1.08x** | **94%** | **35%** |
+| 场景 | 任务数 | Makespan | 最优 Makespan | 比率 | 成功率 | 利用率 |
+|------|:------:|:--------:|:-------------:|:----:|:------:|:------:|
+| 1p | 8 | 704.6s | 584.9s | 1.20x | 80% | 44% |
+| 2p | 8 | 684.9s | 931.0s | 0.74x | 80% | 47% |
+| 3p | 8 | 854.1s | 642.8s | 1.33x | 72% | 47% |
+| 4p | 8 | 739.5s | 465.0s | 1.59x | 82% | 40% |
+| 5p | 8 | 654.0s | 490.9s | 1.33x | 80% | 50% |
+| 6p | 8 | 460.1s | 489.8s | 0.94x | 88% | 57% |
+| **平均** | — | **682.9s** | — | **1.19x** | **80%** | **47%** |
+
+> 每个场景运行 5 次（不同 seed），共 30 次实验。Makespan 比率 = 系统 Makespan / MILP 最优 Makespan，越接近 1.0 越优。
 
 See [`docs/reports/evaluation_report.md`](docs/reports/evaluation_report.md) for full details.
 
@@ -217,7 +225,7 @@ See [`docs/reports/evaluation_report.md`](docs/reports/evaluation_report.md) for
 │                    ▼                             ▼            │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │           Simulation Execution                          │  │
-│  │   ArmInterface → Isaac Sim (PhysX Physics)             │  │
+│  │   ArmInterface → PhysXOnlySimulator / Isaac Sim        │  │
 │  └────────────────────────┬───────────────────────────────┘  │
 │                           │                                   │
 │      ┌────────────────────┼────────────────────┐              │
@@ -295,7 +303,9 @@ Multi-Arm-Scheduling-Agent/
 │   │   ├── planner.py                 # Task planner (LLM/heuristic)
 │   │   ├── code_generator.py          # Code generator (LLM/template)
 │   │   ├── llm_clients/
-│   │   │   └── sync_client.py         # Sync LLM client (ModelScope API)
+│   │   │   ├── sync_client.py         # Sync LLM client (OpenAI-compatible)
+│   │   │   ├── openai_client.py       # OpenAI client
+│   │   │   └── anthropic_client.py    # Anthropic client
 │   │   └── prompts/                   # Prompt templates
 │   ├── harness/                       # Harness Engineering framework
 │   │   ├── task_decomposer.py         # Task decomposition
@@ -304,8 +314,9 @@ Multi-Arm-Scheduling-Agent/
 │   │   ├── exception_handler.py       # Exception handling
 │   │   └── feedback_loop.py           # Closed-loop feedback
 │   ├── simulation/                    # Simulation interfaces
-│   │   ├── base.py                    # Abstract interface
+│   │   ├── base.py                    # Abstract interface (SimulationInterface)
 │   │   ├── isaac_sim.py               # Isaac Sim 4.5 backend
+│   │   ├── physx_only.py              # PhysXOnlySimulator (当前默认)
 │   │   ├── mrta_travel.py             # MRTA travel time manager
 │   │   └── arm_interface.py           # Primitive → simulation adapter
 │   └── evaluation/                    # Evaluation module
@@ -332,8 +343,11 @@ Multi-Arm-Scheduling-Agent/
 │   └── source/                        # User documentation
 ├── scripts/
 │   ├── run_simulation.py              # Simulation runner
+│   ├── run_all_experiments.py         # Batch experiment runner (6×5=30)
+│   ├── _run_single.py                 # Single experiment runner
 │   ├── evaluate.py                    # Evaluation script
 │   └── evaluate_rigorous.py           # Rigorous evaluation (NeurIPS)
+├── outputs/experiments/               # 30 experiment result JSONs
 ├── tests/                             # Unit + integration tests
 ├── requirements.txt
 └── setup.py
@@ -357,7 +371,7 @@ python -m pytest tests/ --cov=src --cov-report=html
 
 - [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR) — MRTA-Benchmark dataset (RSS 2025)
 - [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim) — Physics simulation platform
-- [ModelScope](https://www.modelscope.cn/) — LLM inference API
+- [DeepSeek](https://platform.deepseek.com/) — LLM inference API (DeepSeek Chat)
 - [OpenHarness](https://github.com/HKUDS/OpenHarness) — Harness Engineering architecture reference
 
 ---
