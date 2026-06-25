@@ -320,7 +320,7 @@ history.append(exception, recovery, outcome)</div>
     <tr><td>5p (MRTA实例)</td><td>8</td><td>311.7s</td><td>490.9s</td><td>0.64x</td><td>35%</td></tr>
     <tr><td>6p (MRTA实例)</td><td>8</td><td>818.2s</td><td>489.8s</td><td>1.67x</td><td>33%</td></tr>
   </table>
-  <p class="dim" style="font-size: 14px;">注：MILP最优基准考虑完整工件流转约束，当前启发式调度更激进，因此Makespan更短。</p>
+  <p class="dim" style="font-size: 14px;">注：引入MRTA旅行时间后，平均比率1.08x，接近MRTA基准。部分场景（3p/4p/6p）因启发式方法非全局最优而略长于基准。</p>
 </div>
 
 <!-- Slide 6b: Experiment Analysis -->
