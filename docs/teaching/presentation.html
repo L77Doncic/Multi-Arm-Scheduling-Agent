@@ -236,7 +236,7 @@ if exception.type == TIMEOUT:
     if attempts < max_retries:
         → RETRY (重试)
     else:
-        → SKIP (跳过)
+        → REPLAN (重规划)
 
 if exception.type == COLLISION:
     → REPLAN (重规划，换路径)
@@ -333,7 +333,6 @@ history.append(exception, recovery, outcome)</div>
     <tr><td>6p</td><td>8</td><td>818.2s</td><td>489.8s</td><td>1.67x</td><td>75%</td><td>33%</td></tr>
     <tr style="font-weight:bold"><td>平均</td><td>—</td><td>—</td><td>—</td><td>1.08x</td><td>94%</td><td>35%</td></tr>
   </table>
-  <p class="dim" style="font-size: 14px;">注：引入MRTA旅行时间后，平均比率1.08x，接近MRTA基准。部分场景（3p/4p/6p）因启发式方法非全局最优而略长于基准。</p>
 </div>
 
 <!-- Slide 6b: Experiment Analysis -->
@@ -351,7 +350,7 @@ history.append(exception, recovery, outcome)</div>
     <div class="card" style="border-left: 4px solid #ee0000;">
       <h3>2. 部分场景超过基准的原因</h3>
       <p>3p(1.18x)、4p(1.61x)、6p(1.67x) 长于MRTA基准</p>
-      <p style="font-size: 14px; color: #888;">MRTA基准用MILP求解器找全局最优，我们用启发式规则。启发式方法在复杂场景下不够优化，但结果仍然可行。</p>
+      <p style="font-size: 14px; color: #888;">MRTA基准用MILP求解器找全局最优，我们用贪心算法。贪心方法在复杂场景下不够优化，但结果仍然可行。</p>
     </div>
   </div>
 
@@ -374,7 +373,7 @@ history.append(exception, recovery, outcome)</div>
 
 <!-- Slide 7: Problems -->
 <div class="slide">
-  <p class="dim">06 / 遇到的问题（仍然存在）</p>
+  <p class="dim">07 / 遇到的问题（仍然存在）</p>
   <h2>❌ 问题清单</h2>
 
   <div class="grid grid-3">
@@ -423,7 +422,7 @@ history.append(exception, recovery, outcome)</div>
 
 <!-- Slide 8: Methods Tried -->
 <div class="slide">
-  <p class="dim">07 / 尝试的方法</p>
+  <p class="dim">08 / 尝试的方法</p>
   <h2>🔧 解决问题的尝试</h2>
 
   <div class="grid">
@@ -456,6 +455,21 @@ history.append(exception, recovery, outcome)</div>
       <h3>子进程隔离</h3>
       <p>每个实验用独立子进程运行，用<code>os._exit(0)</code>避免Isaac Sim崩溃。</p>
       <span class="tag tag-success">成功</span>
+    </div>
+    <div class="card">
+      <h3>MRTA旅行时间</h3>
+      <p>实现mrta_travel.py模块，加载MRTA T_t矩阵，将移动时间纳入Makespan计算。</p>
+      <span class="tag tag-success">成功</span>
+    </div>
+    <div class="card">
+      <h3>真实LLM API</h3>
+      <p>接入mimo-v2.5模型，使用HTTP API避免OpenAI SDK兼容性问题。</p>
+      <span class="tag tag-success">成功</span>
+    </div>
+    <div class="card">
+      <h3>并行任务调度</h3>
+      <p>修改task_decomposer支持跨工件并行，修改resource_allocator添加并行机会评分。</p>
+      <span class="tag tag-warning">部分成功</span>
     </div>
   </div>
 </div>
