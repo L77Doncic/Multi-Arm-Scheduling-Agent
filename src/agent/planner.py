@@ -183,9 +183,6 @@ class TaskPlanner:
         tasks: List[TaskNode] = []
         task_counter = 0
 
-        # Track which station is busy at what time for parallel detection
-        station_last_task: Dict[str, str] = {}  # station_id -> last task_id using it
-
         for wp in workpieces:
             wp_id = wp.get("id", "wp")
             op_sequence = wp.get("operations_sequence", [])
@@ -222,9 +219,6 @@ class TaskPlanner:
                 )
                 tasks.append(task)
                 prev_task_id = task_id
-
-                # Track station usage for parallel detection
-                station_last_task[station_id] = task_id
 
         logger.info(
             "Generated %d tasks with parallel opportunities across %d workpieces",

@@ -342,11 +342,13 @@ class ResourceAllocator:
                     task, arm, assignment, task_deps, task_dependents
                 )
 
+                # Normalize weights to sum to 1.0
+                total_weight = self.capability_weight + self.workload_weight + self.priority_weight + 0.3
                 composite = (
-                    self.capability_weight * cap_score
-                    + self.workload_weight * balance_score
-                    + self.priority_weight * priority_score
-                    + 0.4 * parallel_score  # 40% weight for parallelism
+                    (self.capability_weight / total_weight) * cap_score
+                    + (self.workload_weight / total_weight) * balance_score
+                    + (self.priority_weight / total_weight) * priority_score
+                    + (0.3 / total_weight) * parallel_score  # 30% weight for parallelism
                 )
 
                 if composite > best_score:
@@ -375,7 +377,8 @@ class ResourceAllocator:
         Calculate parallel opportunity score for assigning a task to an arm.
 
         Key insight: Tasks on DIFFERENT arms can run in parallel.
-        We want to distribute independent tasks across different arms.
+        We want to DISTRIBUTE independent tasks across different arms,
+        not堆積 them on the same arm.
 
         Returns a score in [0.0, 1.0] where higher means this assignment
         enables more parallel execution.
@@ -390,6 +393,10 @@ class ResourceAllocator:
             # First task overall - neutral
             return 0.5
 
+        if not other_arm_tasks:
+            # No tasks on other arms yet - this arm is the only option
+            return 0.5
+
         # Count how many tasks on OTHER arms this task can run in parallel with
         parallel_with_others = 0
         for other_tid in other_arm_tasks:
@@ -398,10 +405,17 @@ class ResourceAllocator:
                 task.id not in task_deps.get(other_tid, set())):
                 parallel_with_others += 1
 
-        # Higher score if this task can run in parallel with many tasks on OTHER arms
-        if other_arm_tasks:
+        # KEY LOGIC: If this task can run in parallel with tasks on OTHER arms,
+        # we should put it on THIS arm (different arm = parallel execution)
+        # Higher score = more parallel opportunities = better assignment
+        if parallel_with_others > 0:
+            # This task can run in parallel with tasks on other arms
+            # Putting it on THIS arm enables parallel execution
             return min(1.0, parallel_with_others / len(other_arm_tasks))
-        return 0.5
+        else:
+            # This task has dependencies with all tasks on other arms
+            # Must run after them - less parallel opportunity
+            return 0.2
 
     def _match_capabilities(self, task: TaskInfo, arm: ArmInfo) -> float:
         """
