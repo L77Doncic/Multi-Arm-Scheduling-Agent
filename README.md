@@ -4,8 +4,8 @@
 
 [![Python](https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![LLM](https://img.shields.io/badge/LLM-DeepSeek--V4-purple?logo=huggingface&logoColor=white)](https://www.modelscope.cn/)
-[![Simulator](https://img.shields.io/badge/simulation-Mock%20%7C%20Isaac%20Sim%20%7C%20Omniverse%20%7C%20Isaac%20Lab-orange)](docs/design/architecture.md)
+[![LLM](https://img.shields.io/badge/LLM-mimo--v2.5-purple?logo=huggingface&logoColor=white)](https://www.xiaomimimo.com/)
+[![Simulator](https://img.shields.io/badge/simulation-Isaac%20Sim%204.5-orange)](docs/design/architecture.md)
 [![Framework](https://img.shields.io/badge/framework-Harness%20Engineering-teal)](docs/design/harness_design.md)
 
 **基于 LLM 与 Harness Engineering 的多机械臂调度智能体代码生成与仿真验证系统**
@@ -30,12 +30,12 @@ Natural Language → Task Decomposition → Resource Allocation → Code Generat
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **LLM-Powered Scheduling** | DeepSeek-V4-Flash decomposes instructions into structured task DAGs; falls back to heuristics if LLM is unavailable |
-| 🔄 **Dynamic Resource Allocation** | Greedy capability matching + conflict detection + load balancing across robot arms |
-| ✅ **Closed-Loop Feedback** | Simulation results flow back to adjust timeout, retry count, resource weights, and task priority |
+| 🧠 **LLM-Powered Scheduling** | mimo-v2.5 decomposes instructions into structured task DAGs; falls back to heuristics if LLM is unavailable |
+| 🔄 **Dynamic Resource Allocation** | Greedy capability matching + 4 conflict types + load balancing + parallel opportunity scoring |
+| ✅ **Closed-Loop Feedback** | Simulation results flow back to adjust 6 strategy parameters (timeout, retry, resource_weight, priority_boost, speed_factor, force_factor) |
 | 🎯 **Dynamic Code Generation** | Composes executable code from 9 atomic primitives — no fixed skill library |
-| 🔌 **Multi-Backend Simulation** | Mock / Isaac Sim / Omniverse / Isaac Lab — unified `SimulationInterface`, zero code change to switch |
-| 📊 **Rigorous Evaluation** | Makespan, success rate, utilization, constraint violations + paired t-test (NeurIPS standard) |
+| 🔌 **Isaac Sim Physics** | Real Franka Panda USD models + PhysX physics + Jacobian IK control |
+| 📊 **MRTA-Benchmark** | 6 production line scenarios with travel time matrices, MILP optimal baseline |
 
 ---
 
@@ -57,8 +57,8 @@ pip install -e .
 ### Run Your First Simulation
 
 ```bash
-# Using Mock simulator (no GPU required)
-python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4station.yaml
+# Run Isaac Sim simulation
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 ```
 
 <details>
@@ -68,30 +68,27 @@ python scripts/run_simulation.py --scenario data/scenarios/assembly_line_4statio
 ======================================================================
 SIMULATION RESULTS
 ======================================================================
-Execution ID:    c97c0ca2
-Tasks:           14
-Makespan:        23.00s
+Execution ID:    a1b2c3d4
+Scenario:        MRTA-1p-ProductionLine
+Tasks:           8
+Makespan:        247.4s
+Optimal:         584.9s (MRTA baseline)
+Ratio:           0.42x
 Success Rate:    100.0%
-Resource Util:   66.7%
-Violations:      3
-
-TASK DETAILS:
-  ✓ t_001  | Pick and load workpiece A    | arm=arm_001 | completed
-  ✓ t_002  | Transport workpiece A         | arm=arm_001 | completed
-  ✓ t_003  | Assemble components of A      | arm=arm_001 | completed
-  ...
+Resource Util:   34.0%
+Violations:      0
 ```
 </details>
 
-### Python API (3 Lines)
+### Python API
 
 ```python
-import yaml
+import json, yaml
 from agent.core import SchedulingAgent
 
 # Load config and scenario
 config = yaml.safe_load(open("configs/agent_config.yaml"))
-scene = yaml.safe_load(open("data/scenarios/assembly_line_4station.yaml"))["scenario"]
+scene = json.load(open("data/scenarios/1p_production_line.json"))["scenario"]
 
 # Create agent and execute
 agent = SchedulingAgent(config)
@@ -117,10 +114,11 @@ Configure in `configs/agent_config.yaml`:
 ```yaml
 llm:
   provider: "openai"                          # OpenAI-compatible API
-  model: "deepseek-ai/DeepSeek-V4-Flash"      # ModelScope model
-  api_base: "https://api-inference.modelscope.cn/v1"
+  model: "mimo-v2.5"                          # Xiaomi MiMo model
+  api_base: "https://token-plan-cn.xiaomimimo.com/v1"
   api_key_env: "OPENAI_API_KEY"               # Read key from env var
   temperature: 0.7
+  top_p: 0.9
   max_tokens: 4096
 ```
 
@@ -130,9 +128,8 @@ Set your API key via environment variable or `.env` file:
 # Option 1: Environment variable
 export OPENAI_API_KEY="your-api-key-here"
 
-# Option 2: .env file (copy .env.example)
-cp .env.example .env
-# Edit .env and fill in your key
+# Option 2: .env file
+echo 'OPENAI_API_KEY=your-api-key-here' > .env
 ```
 
 <details>
@@ -140,7 +137,7 @@ cp .env.example .env
 
 | Provider | `llm.provider` | Model Example | API Base |
 |----------|----------------|---------------|----------|
-| ModelScope | `"openai"` | `deepseek-ai/DeepSeek-V4-Flash` | `https://api-inference.modelscope.cn/v1` |
+| Xiaomi MiMo | `"openai"` | `mimo-v2.5` | `https://token-plan-cn.xiaomimimo.com/v1` |
 | OpenAI | `"openai"` | `gpt-4-turbo` | `https://api.openai.com/v1` |
 | Anthropic | `"anthropic"` | `claude-3-opus-20240229` | `https://api.anthropic.com` |
 | Local | — | — | Heuristic fallback (no API needed) |
@@ -149,25 +146,18 @@ cp .env.example .env
 ### Simulation Backend
 
 ```bash
-# Mock (default, no GPU)
-python scripts/run_simulation.py --scenario ... --sim mock
+# Isaac Sim (default, requires NVIDIA GPU)
+python scripts/run_simulation.py --scenario data/scenarios/1p_production_line.json
 
-# Isaac Sim (requires NVIDIA GPU + Isaac Sim installed)
-python scripts/run_simulation.py --scenario ... --sim isaac
-
-# Omniverse
-python scripts/run_simulation.py --scenario ... --sim omniverse
-
-# Isaac Lab
-python scripts/run_simulation.py --scenario ... --sim isaac_lab
+# Run single experiment
+python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
 ```
 
 | Backend | GPU Required | Physics | Use Case |
 |---------|:------------:|---------|----------|
-| `mock` | ❌ | None | Development, CI/CD, logic verification |
-| `isaac` | ✅ | PhysX 5 | Physical simulation validation |
-| `omniverse` | ✅ | PhysX 5 | Scene rendering + simulation |
-| `isaac_lab` | ✅ | PhysX 5 | RL training + batch evaluation |
+| `isaac` | ✅ RTX GPU | PhysX | Physical simulation validation (default) |
+
+> **Note**: Mock simulator has been removed. All simulations use Isaac Sim with real physics.
 
 ---
 
@@ -176,13 +166,11 @@ python scripts/run_simulation.py --scenario ... --sim isaac_lab
 ### Run Benchmark
 
 ```bash
-# Rigorous evaluation (5 runs, paired t-test, NeurIPS standard)
-python scripts/evaluate_rigorous.py \
-    --scenario data/scenarios/assembly_line_4station.yaml \
-    --runs 5
+# Run all experiments (6 scenarios × 5 seeds = 30 runs)
+python scripts/run_all_experiments.py
 
-# MRTA-Benchmark (APEX-MR) dataset evaluation
-python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
+# Run single experiment
+python scripts/_run_single.py data/scenarios/1p_production_line.json 42 outputs/experiments
 ```
 
 ### Metrics
@@ -194,14 +182,19 @@ python scripts/evaluate.py --dataset data/datasets/MRTA-Benchmark
 | **Resource Utilization** | `sum(durations) / (makespan × num_arms)` | ↑ Maximize |
 | **Constraint Violations** | Count of overlaps + capability mismatches | ↓ Minimize |
 
-### Unified Benchmark
+### MRTA-Benchmark Results
 
-| Dataset | Source | Optimal Makespan | Method |
-|---------|--------|:----------------:|--------|
-| 4-Station Assembly Line | Custom | 25.0s | MILP |
-| MRTA-Benchmark (13 tasks) | [APEX-MR](https://github.com/intelligent-control-lab/APEX-MR) (RSS 2025) | 20–95s | Paper Table 1 |
+| Scenario | Tasks | Makespan | Optimal | Ratio | Success | Utilization |
+|----------|:-----:|----------|---------|-------|---------|-------------|
+| 1p | 8 | 247.4s | 584.9s | 0.42x | 100% | 34% |
+| 2p | 8 | 885.9s | 931.0s | 0.95x | 88% | 33% |
+| 3p | 8 | 757.2s | 642.8s | 1.18x | 100% | 39% |
+| 4p | 8 | 750.0s | 465.0s | 1.61x | 100% | 38% |
+| 5p | 8 | 311.7s | 490.9s | 0.64x | 100% | 35% |
+| 6p | 8 | 818.2s | 489.8s | 1.67x | 75% | 33% |
+| **Average** | — | — | — | **1.08x** | **94%** | **35%** |
 
-See [`data/benchmark_specification.md`](data/benchmark_specification.md) for full details.
+See [`docs/reports/evaluation_report.md`](docs/reports/evaluation_report.md) for full details.
 
 ---
 
@@ -224,7 +217,7 @@ See [`data/benchmark_specification.md`](data/benchmark_specification.md) for ful
 │                    ▼                             ▼            │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │           Simulation Execution                          │  │
-│  │   ArmInterface → Mock / Isaac Sim / Omniverse / Lab    │  │
+│  │   ArmInterface → Isaac Sim (PhysX Physics)             │  │
 │  └────────────────────────┬───────────────────────────────┘  │
 │                           │                                   │
 │      ┌────────────────────┼────────────────────┐              │
@@ -251,7 +244,7 @@ Five interconnected modules ensure reliable, traceable scheduling:
 | Module | File | Responsibility |
 |--------|------|----------------|
 | **TaskDecomposer** | `harness/task_decomposer.py` | NL instruction → structured subtasks + dependency DAG |
-| **ResourceAllocator** | `harness/resource_allocator.py` | Greedy matching + 4 conflict types + load balancing |
+| **ResourceAllocator** | `harness/resource_allocator.py` | Greedy matching + 4 conflict types + load balancing + parallel opportunity scoring |
 | **ResultValidator** | `harness/result_validator.py` | Temporal / spatial / resource constraint checking |
 | **ExceptionHandler** | `harness/exception_handler.py` | 7 exception types + 4 recovery strategies + escalation |
 | **FeedbackLoop** | `harness/feedback_loop.py` | Performance analysis → strategy parameter adjustment |
@@ -312,11 +305,8 @@ Multi-Arm-Scheduling-Agent/
 │   │   └── feedback_loop.py           # Closed-loop feedback
 │   ├── simulation/                    # Simulation interfaces
 │   │   ├── base.py                    # Abstract interface
-│   │   ├── mock_simulator.py          # Pure Python simulator
-│   │   ├── isaac_sim.py               # Isaac Sim backend
-│   │   ├── omniverse.py               # Omniverse backend
-│   │   ├── isaac_lab.py               # Isaac Lab backend
-│   │   ├── scene_builder.py           # Scene builder
+│   │   ├── isaac_sim.py               # Isaac Sim 4.5 backend
+│   │   ├── mrta_travel.py             # MRTA travel time manager
 │   │   └── arm_interface.py           # Primitive → simulation adapter
 │   └── evaluation/                    # Evaluation module
 │       ├── metrics.py                 # Metric calculation
@@ -325,8 +315,14 @@ Multi-Arm-Scheduling-Agent/
 │       └── visualizer.py              # Gantt charts + HTML reports
 ├── configs/                           # Configuration files
 ├── data/
-│   ├── datasets/MRTA-Benchmark/       # APEX-MR dataset (13 tasks)
-│   ├── scenarios/                     # Scenario configs
+│   ├── datasets/MRTA-Benchmark/       # APEX-MR dataset
+│   ├── scenarios/                     # 6 production line scenarios (JSON)
+│   │   ├── 1p_production_line.json    # 1 workpiece, 4 stations, 3 arms
+│   │   ├── 2p_production_line.json    # 2 workpieces
+│   │   ├── 3p_production_line.json    # 3 workpieces
+│   │   ├── 4p_production_line.json    # 4 workpieces
+│   │   ├── 5p_production_line.json    # 5 workpieces
+│   │   └── 6p_production_line.json    # 6 workpieces
 │   └── benchmark_specification.md     # Unified benchmark spec
 ├── docs/
 │   ├── design/                        # Design documents
