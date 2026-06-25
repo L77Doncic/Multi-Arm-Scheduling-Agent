@@ -173,9 +173,18 @@ class TaskPlanner:
     def _plan_from_scene(
         self, stations: List[Dict], workpieces: List[Dict]
     ) -> List[TaskNode]:
-        """Generate tasks from scene configuration."""
+        """
+        Generate tasks from scene configuration with parallel opportunities.
+
+        Key design: Tasks within the same workpiece are sequential (you can't
+        assemble before picking), but tasks across DIFFERENT workpieces can
+        run in parallel if they use different stations/robots.
+        """
         tasks: List[TaskNode] = []
         task_counter = 0
+
+        # Track which station is busy at what time for parallel detection
+        station_last_task: Dict[str, str] = {}  # station_id -> last task_id using it
 
         for wp in workpieces:
             wp_id = wp.get("id", "wp")
@@ -195,6 +204,8 @@ class TaskPlanner:
                 caps = station.get("capabilities_required", [])
                 duration = station.get("estimated_duration", 3.0)
 
+                # Dependencies: only within the same workpiece (sequential)
+                # Tasks across different workpieces can run in parallel
                 deps = [prev_task_id] if prev_task_id else []
 
                 task = TaskNode(
@@ -212,6 +223,13 @@ class TaskPlanner:
                 tasks.append(task)
                 prev_task_id = task_id
 
+                # Track station usage for parallel detection
+                station_last_task[station_id] = task_id
+
+        logger.info(
+            "Generated %d tasks with parallel opportunities across %d workpieces",
+            len(tasks), len(workpieces),
+        )
         return tasks
 
     def _plan_from_instruction(self, instruction: str) -> List[TaskNode]:

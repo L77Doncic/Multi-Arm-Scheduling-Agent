@@ -301,12 +301,20 @@ class ResourceAllocator:
         arm_infos: List[ArmInfo],
     ) -> Dict[str, str]:
         """
-        Greedy assignment: for each task (sorted by priority descending)
-        pick the arm with the highest composite score.
+        Greedy assignment with parallel opportunity optimization.
+
+        Key improvement: Tasks with no dependency relationship can run
+        in parallel on different arms. This increases resource utilization.
         """
-        # Sort tasks by priority (highest first) so important tasks get
-        # the best arm picks.
+        # Sort tasks by priority (highest first)
         sorted_tasks = sorted(task_infos, key=lambda t: t.priority, reverse=True)
+
+        # Build dependency set for quick lookup
+        task_deps: Dict[str, set] = {t.id: set(t.dependencies) for t in task_infos}
+        task_dependents: Dict[str, set] = defaultdict(set)
+        for t in task_infos:
+            for dep in t.dependencies:
+                task_dependents[dep].add(t.id)
 
         arm_workload: Dict[str, float] = {a.id: a.current_load for a in arm_infos}
         assignment: Dict[str, str] = {}
@@ -317,6 +325,7 @@ class ResourceAllocator:
 
             for arm in arm_infos:
                 cap_score = self._match_capabilities(task, arm)
+
                 # Simulate adding this task to the arm for workload calc
                 simulated_assignment = dict(assignment)
                 simulated_assignment[task.id] = arm.id
@@ -327,10 +336,17 @@ class ResourceAllocator:
                     max(t.priority for t in task_infos), 1.0
                 )
 
+                # Parallel opportunity score: boost score if this task
+                # can run in parallel with tasks already on this arm
+                parallel_score = self._calculate_parallel_opportunity(
+                    task, arm, assignment, task_deps, task_dependents
+                )
+
                 composite = (
                     self.capability_weight * cap_score
                     + self.workload_weight * balance_score
                     + self.priority_weight * priority_score
+                    + 0.4 * parallel_score  # 40% weight for parallelism
                 )
 
                 if composite > best_score:
@@ -346,6 +362,46 @@ class ResourceAllocator:
                 logger.warning("No arm found for task %s", task.id)
 
         return assignment
+
+    def _calculate_parallel_opportunity(
+        self,
+        task: TaskInfo,
+        arm: ArmInfo,
+        assignment: Dict[str, str],
+        task_deps: Dict[str, set],
+        task_dependents: Dict[str, set],
+    ) -> float:
+        """
+        Calculate parallel opportunity score for assigning a task to an arm.
+
+        Key insight: Tasks on DIFFERENT arms can run in parallel.
+        We want to distribute independent tasks across different arms.
+
+        Returns a score in [0.0, 1.0] where higher means this assignment
+        enables more parallel execution.
+        """
+        # Find tasks already assigned to this arm
+        arm_tasks = [tid for tid, aid in assignment.items() if aid == arm.id]
+
+        # Find tasks NOT on this arm (on other arms)
+        other_arm_tasks = [tid for tid, aid in assignment.items() if aid != arm.id]
+
+        if not arm_tasks and not other_arm_tasks:
+            # First task overall - neutral
+            return 0.5
+
+        # Count how many tasks on OTHER arms this task can run in parallel with
+        parallel_with_others = 0
+        for other_tid in other_arm_tasks:
+            # Check if there's no dependency between this task and the other task
+            if (other_tid not in task_deps.get(task.id, set()) and
+                task.id not in task_deps.get(other_tid, set())):
+                parallel_with_others += 1
+
+        # Higher score if this task can run in parallel with many tasks on OTHER arms
+        if other_arm_tasks:
+            return min(1.0, parallel_with_others / len(other_arm_tasks))
+        return 0.5
 
     def _match_capabilities(self, task: TaskInfo, arm: ArmInfo) -> float:
         """
