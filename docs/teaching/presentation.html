@@ -138,7 +138,7 @@
         <h4>② ResourceAllocator 资源分配</h4>
         <p><strong>输入：</strong>任务列表 + 机械臂列表<br>
         <strong>输出：</strong>任务→机械臂映射表<br>
-        <strong>算法：</strong>贪心能力匹配(60%) + 负载均衡(30%) + 优先级(10%)<br>
+        <strong>算法：</strong>贪心评分 = 能力匹配(46%) + 负载均衡(23%) + 优先级(8%) + 并行机会(23%)<br>
         <strong>冲突检测：</strong>TEMPORAL(时间) / CAPABILITY(能力) / RESOURCE(资源) / COLLISION(碰撞)</p>
       </div>
     </div>
@@ -211,10 +211,14 @@
       <h3>分配算法流程</h3>
       <div class="code">for each task:
     candidates = arms WHERE capability matches
-    score = capability_weight × match_score
-          + workload_weight × (1 - load_ratio)
-          + priority_weight × task_priority
+    score = 0.46 × capability_match    # 能力匹配
+          + 0.23 × workload_balance    # 负载均衡
+          + 0.08 × task_priority       # 任务优先级
+          + 0.23 × parallel_opportunity # 并行机会
     assign task → highest_score arm
+
+# 并行机会：优先选择空闲臂
+# 如果任务能与其他臂上的任务并行，给高分
 
 # 冲突解决（迭代最多10轮）
 while conflicts exist:

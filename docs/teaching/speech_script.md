@@ -1,12 +1,10 @@
-# 多机械臂调度智能体 — 演讲稿
-
-> 逐页逐句的演讲脚本，事无巨细，可直接照读。
+# 多机械臂调度智能体
 
 ---
 
 ## 第1页：封面
 
-各位老师好，我今天汇报的题目是"多机械臂调度智能体"。这是一个LLM驱动的、在Harness约束框架下运行的多机械臂协同调度系统。我会从项目概述、Harness框架详解、实验结果分析、遇到的问题、以及总结展望这几个方面来汇报。
+朱老师好，我今天会从项目概述、Harness框架详解、实验结果分析、遇到的问题、以及总结展望这几个方面来汇报。
 
 ---
 
@@ -30,36 +28,36 @@
 
 第六步，输出指标。计算最终的makespan、成功率、资源利用率等。
 
-左边这个是Harness Engineering框架的5个核心模块：TaskDecomposer负责任务分解，ResourceAllocator负责资源分配，ResultValidator负责结果验证，ExceptionHandler负责异常处理，FeedbackLoop负责闭环反馈。右边是技术栈，包括Isaac Sim 4.5物理仿真、Jacobian IK逆运动学控制、9个原子原语、Omni Replicator帧捕获、MRTA旅行时间矩阵、以及MILP最优基准对比。
+左边这个是Harness Engineering框架的5个核心模块：TaskDecomposer负责任务分解，ResourceAllocator负责资源分配，ResultValidator负责结果验证，ExceptionHandler负责异常处理，FeedbackLoop负责闭环反馈。右边是仿真模拟，包括Isaac Sim 4.5物理仿真、逆运动学关节控制、9个原子原语、Omni Replicator帧捕获、MRTA旅行时间矩阵、以及MILP最优基准对比。
 
 ---
 
 ## 第3页：Harness Engineering详解
 
-接下来是本次汇报的重点——Harness Engineering框架。
-
-Harness Engineering是我们系统的核心"大脑"，它由5个模块组成，负责约束调度、异常处理和自我优化。
+Harness Engineering是我们系统的核心，它由5个模块组成，负责约束调度、异常处理和自我优化。
 
 第一个模块是TaskDecomposer，任务分解。它接收自然语言指令和场景配置，输出结构化的子任务列表和依赖DAG图。如果系统配置了LLM，就用LLM来智能拆解；如果没有LLM API，就用模板规则兜底。每个子任务都包含operation_type（操作类型）、required_capabilities（需要的能力）、dependencies（依赖关系）、estimated_duration（预估耗时）这些关键数据。
 
-第二个模块是ResourceAllocator，资源分配。它接收任务列表和机械臂列表，输出任务到机械臂的映射表。分配算法是贪心的，评分公式是：capability_weight乘以能力匹配度，加上workload_weight乘以（1减去负载率），加上priority_weight乘以任务优先级，再加上parallel_weight乘以并行机会评分。默认权重是能力匹配60%、负载均衡30%、优先级10%、并行30%。
+第二个模块是ResourceAllocator，资源分配。它接收任务列表和机械臂列表，输出任务到机械臂的映射表。分配算法是贪心的，评分由四部分组成：能力匹配度（权重46%）、负载均衡度（权重23%）、任务优先级（权重8%）、并行机会评分（权重23%）。这四个权重归一化后总和为100%。
 
 ResourceAllocator还有一个重要的功能是冲突检测。它能检测4种冲突：TEMPORAL时间冲突（同一机械臂任务过多）、CAPABILITY能力不足（机械臂没有需要的能力）、RESOURCE资源竞争（两个任务争用同一工位）、COLLISION碰撞风险（两个机械臂路径交叉）。检测到冲突后，系统会把低优先级的任务重新分配到其他机械臂，最多迭代10轮。
 
 第三个模块是ResultValidator，结果验证。它检查时间约束、空间约束、资源约束和依赖约束，输出is_valid和violations列表。
 
-第四个模块是ExceptionHandler，异常处理。它能处理7种异常类型：TIMEOUT超时、RESOURCE_CONFLICT资源冲突、COLLISION碰撞、COMMUNICATION_FAILURE通信故障、SIMULATION_ERROR仿真错误、CODE_GENERATION_ERROR代码生成错误、CONSTRAINT_VIOLATION约束违规。
+第四个模块是ExceptionHandler，异常处理。具体来说它能处理7种异常类型：TIMEOUT超时、RESOURCE_CONFLICT资源冲突、COLLISION碰撞、COMMUNICATION_FAILURE通信故障、SIMULATION_ERROR仿真错误、CODE_GENERATION_ERROR代码生成错误、CONSTRAINT_VIOLATION约束违规。
 
 针对每种异常，系统有4种恢复策略：RETRY重试、SKIP跳过、FALLBACK降级、REPLAN重规划。比如TIMEOUT超时，如果重试次数没到上限就RETRY，到上限就SKIP。COLLISION碰撞就REPLAN重规划换路径。SIMULATION_ERROR仿真错误就FALLBACK降级到模板代码。
 
 第五个模块是FeedbackLoop，反馈闭环。这是整个系统最关键的部分。它分析执行结果的成功率、耗时分布、错误模式，然后调整6个参数：
 
-- timeout_adjustment：超时倍数，性能差时乘以1.2放宽超时
-- retry_count：重试次数，成功率低时加1
-- resource_weight：资源分配权重，机械臂过载时加0.1让分配更均衡
-- priority_boost：优先级提升，频繁失败的任务提升优先级
-- speed_factor：代码生成速度系数，失败率高时乘以0.8让动作更慢更稳
-- force_factor：抓取力系数，失败率高时乘以1.15抓得更紧
+
+- timeout_adjustment：超时倍数，性能差时乘以1.2放宽超时。避免因物理仿真卡顿或轻微避障导致任务被强制终止，从而把“慢成功”误判为“失败”。
+- retry_count：重试次数，成功率低时加1。它的作用是**提升我们的核心评估指标，任务成功率** 。允许智能体在第一次抓取滑脱后，自动再试一次，而不是直接放弃导致整个 Makespan 报废。
+- resource_weight：资源分配权重，机械臂过载时加0.1让分配更均衡。
+- priority_boost：优先级提升，频繁失败的任务提升优先级，主要目的是打破死锁。
+- speed_factor：代码生成速度系数，失败率高时乘以0.8让动作更慢更稳，以提升稳定性。
+- force_factor：抓取力系数，失败率高时乘以1.15抓得更紧，确保工件在搬运路径上不掉落。
+
 
 这6个参数调整后，会应用到ResourceAllocator、ExceptionHandler、CodeGenerator三个模块，形成闭环。
 
