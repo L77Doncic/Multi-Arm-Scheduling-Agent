@@ -339,7 +339,7 @@ class ResourceAllocator:
                 # Parallel opportunity score: boost score if this task
                 # can run in parallel with tasks already on this arm
                 parallel_score = self._calculate_parallel_opportunity(
-                    task, arm, assignment, task_deps, task_dependents
+                    task, arm, assignment, task_deps, task_dependents, task_infos
                 )
 
                 # Normalize weights to sum to 1.0
@@ -372,6 +372,7 @@ class ResourceAllocator:
         assignment: Dict[str, str],
         task_deps: Dict[str, set],
         task_dependents: Dict[str, set],
+        task_infos: List[TaskInfo],
     ) -> float:
         """
         Calculate parallel opportunity score for assigning a task to an arm.
@@ -401,8 +402,12 @@ class ResourceAllocator:
                 parallel_with_others += 1
 
         # KEY LOGIC: Prefer IDLE arms for parallel execution
-        # Calculate load based on task count (simplified)
-        arm_load_penalty = len(arm_tasks) / max(len(assignment), 1)
+        # Calculate load based on task DURATION (not count)
+        task_duration_map = {t.id: t.estimated_duration for t in task_infos}
+        arm_total_duration = sum(task_duration_map.get(tid, 0) for tid in arm_tasks)
+        # Normalize by total duration across all assignments
+        total_all_duration = sum(task_duration_map.get(tid, 0) for tid in assignment)
+        arm_load_penalty = arm_total_duration / max(total_all_duration, 1)
 
         if parallel_with_others > 0:
             # This task can run in parallel with tasks on other arms
@@ -564,10 +569,15 @@ class ResourceAllocator:
             total_duration = sum(
                 task_map[tid].estimated_duration for tid in task_ids if tid in task_map
             )
-            # Use average task duration as threshold for overload detection
-            # If an arm has more than 3x average duration, it's overloaded
-            avg_duration = total_duration / len(task_ids) if task_ids else 0
-            overload_threshold = avg_duration * 3.0  # 3x average = overloaded
+            # Calculate average duration across ALL arms for fair comparison
+            all_durations = []
+            for aid, tids in arm_tasks.items():
+                all_durations.extend(
+                    task_map[tid].estimated_duration for tid in tids if tid in task_map
+                )
+            avg_all = sum(all_durations) / len(all_durations) if all_durations else 1.0
+            # Flag if this arm's total exceeds 2x the average across all arms
+            overload_threshold = avg_all * 2.0
             if total_duration > overload_threshold and len(task_ids) >= 2:
                 # Flag the two lowest-priority tasks as conflicting
                 sorted_tids = sorted(
