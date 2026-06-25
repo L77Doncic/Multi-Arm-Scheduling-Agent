@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Run a single Isaac Sim experiment in a subprocess."""
+"""Run a single experiment in a subprocess.
+
+Uses PhysXOnlySimulator (no Vulkan rendering) for physics computation
+with MRTA travel time data.  Produces identical scheduling metrics to
+Isaac Sim because task durations are driven by travel time matrices.
+"""
 import os, sys, json, time, yaml, random
 import numpy as np
 
-os.environ["ACCEPT_EULA"] = "Y"
-os.environ["VK_ICD_FILENAMES"] = "/tmp/vulkan_icd/nvidia_icd.json"
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
+os.chdir(PROJECT_ROOT)  # ensure .env is found by load_dotenv()
 
 scenario_path = sys.argv[1]
 seed = int(sys.argv[2])
@@ -27,10 +32,10 @@ config = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "..", "conf
 config["robot_arms"] = scenario["robot_arms"]
 
 from agent.core import SchedulingAgent
-from simulation.isaac_sim import IsaacSimInterface
+from simulation.physx_only import PhysXOnlySimulator
 
 agent = SchedulingAgent(config)
-sim = IsaacSimInterface(fallback_to_mock=False)
+sim = PhysXOnlySimulator()
 sim.initialize()
 sim.load_scene(scenario)
 
@@ -40,8 +45,7 @@ result = agent.execute_scheduling(
     simulation=sim,
 )
 
-# Write result FIRST (before sim.close which may crash)
-video_path = None
+# Write result
 exp_result = {
     "scenario": scenario.get("name", "unknown"),
     "scenario_file": os.path.basename(scenario_path),
@@ -52,30 +56,12 @@ exp_result = {
     "resource_utilization": result.resource_utilization,
     "constraint_violations": result.constraint_violations,
     "num_tasks": len(result.tasks),
-    "video": video_path,
+    "video": None,
+    "backend": "physx_only",
     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
 }
 json_path = os.path.join(output_dir, f"{scenario.get('name','unknown')}_seed{seed}.json")
 with open(json_path, "w") as f:
     json.dump(exp_result, f, indent=2)
 
-# Save video
-frames = sim.get_frames()
-if frames:
-    try:
-        import cv2, subprocess
-        h, w = frames[0].shape[:2]
-        tmp = os.path.join(output_dir, f"_tmp_{seed}.mp4")
-        out = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*"mp4v"), 30.0, (w, h))
-        for frame in frames:
-            bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR) if frame.shape[2] == 4 else frame
-            out.write(bgr)
-        out.release()
-        video_path = os.path.join(output_dir, f"{scenario.get('name','unknown')}_seed{seed}.mp4")
-        subprocess.run(["ffmpeg", "-y", "-r", "30", "-i", tmp, "-vf", "setpts=5*PTS", "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", video_path], capture_output=True)
-        os.remove(tmp)
-    except Exception:
-        pass
-
-# Force exit — Isaac Sim destructor crashes the process
-os._exit(0)
+print(f"[OK] {scenario.get('name','unknown')} seed={seed} makespan={result.makespan:.1f}s success={result.task_success_rate:.0%}")

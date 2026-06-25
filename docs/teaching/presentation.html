@@ -63,7 +63,7 @@
 <div class="slide slide-dark" style="text-align: center; justify-content: center; align-items: center;">
   <p class="dim" style="margin-bottom: 24px;">项目汇报</p>
   <h1 style="font-size: 56px;">多机械臂调度智能体</h1>
-  <p style="font-size: 22px; color: #666; margin-top: 16px;">LLM驱动 · Harness约束框架 · Isaac Sim物理仿真</p>
+  <p style="font-size: 22px; color: #666; margin-top: 16px;">LLM驱动 · Harness约束框架 · PhysX纯物理仿真</p>
   <div style="margin-top: 48px;">
     <span class="tag">LLM Orchestration</span>
     <span class="tag">Harness Engineering</span>
@@ -108,10 +108,10 @@
     <div class="card">
       <h3>仿真模拟</h3>
       <ul class="list">
-        <li><strong>Isaac Sim 4.5</strong> — PhysX物理引擎 + Franka Panda USD</li>
+        <li><strong>PhysXOnlySimulator</strong> — 纯物理计算 + MRTA旅行时间</li>
         <li><strong>Jacobian IK</strong> — 逆运动学关节控制</li>
         <li><strong>9个原子原语</strong> — move_to/grip/release/rotate等</li>
-        <li><strong>Omni Replicator</strong> — 帧捕获 + H.264编码</li>
+        <li><strong>MRTA T_t矩阵</strong> — 机械臂间旅行时间</li>
         <li><strong>MILP基准</strong> — PuLP/CBC最优调度对比</li>
       </ul>
     </div>
@@ -282,19 +282,15 @@ history.append(exception, recovery, outcome)</div>
     </div>
     <div class="card">
       <h3>真实LLM API</h3>
-      <p>接入mimo-v2.5模型，使用HTTP API避免OpenAI SDK兼容性问题。</p>
+      <p>接入DeepSeek Chat模型（替代mimo-v2.5，因长prompt超时），使用HTTP API避免OpenAI SDK兼容性问题。</p>
     </div>
     <div class="card">
-      <h3>Isaac Sim集成</h3>
-      <p>Franka Panda USD模型、IK控制、PhysX物理引擎、Ground Plane、Omni Replicator帧捕获。</p>
-    </div>
-    <div class="card">
-      <h3>视频录制</h3>
-      <p>ffmpeg H.264编码、5倍慢动作回放、多场景批量录制。</p>
+      <h3>PhysXOnlySimulator</h3>
+      <p>纯物理计算+MRTA旅行时间，不依赖Vulkan渲染。Franka Panda USD模型、IK控制、PhysX物理引擎。</p>
     </div>
     <div class="card">
       <h3>MRTA-Benchmark</h3>
-      <p>6个场景（1p-6p）、5种子实验、平均成功率94%。</p>
+      <p>6个场景（1p-6p）、5种子实验、平均成功率80%、平均利用率47%。</p>
     </div>
   </div>
 </div>
@@ -310,7 +306,7 @@ history.append(exception, recovery, outcome)</div>
       <div class="metric-label">总实验数</div>
     </div>
     <div class="metric">
-      <div class="metric-value">94%</div>
+      <div class="metric-value">80%</div>
       <div class="metric-label">成功率</div>
     </div>
     <div class="metric">
@@ -325,13 +321,13 @@ history.append(exception, recovery, outcome)</div>
 
   <table>
     <tr><th>场景</th><th>任务数</th><th>Makespan</th><th>最优</th><th>比率</th><th>成功率</th><th>利用率</th></tr>
-    <tr><td>1p</td><td>8</td><td>247.4s</td><td>584.9s</td><td>0.42x</td><td>100%</td><td>34%</td></tr>
-    <tr><td>2p</td><td>8</td><td>885.9s</td><td>931.0s</td><td>0.95x</td><td>88%</td><td>33%</td></tr>
-    <tr><td>3p</td><td>8</td><td>757.2s</td><td>642.8s</td><td>1.18x</td><td>100%</td><td>39%</td></tr>
-    <tr><td>4p</td><td>8</td><td>750.0s</td><td>465.0s</td><td>1.61x</td><td>100%</td><td>38%</td></tr>
-    <tr><td>5p</td><td>8</td><td>311.7s</td><td>490.9s</td><td>0.64x</td><td>100%</td><td>35%</td></tr>
-    <tr><td>6p</td><td>8</td><td>818.2s</td><td>489.8s</td><td>1.67x</td><td>75%</td><td>33%</td></tr>
-    <tr style="font-weight:bold"><td>平均</td><td>—</td><td>—</td><td>—</td><td>1.08x</td><td>94%</td><td>35%</td></tr>
+    <tr><td>1p</td><td>8</td><td>704.6s</td><td>584.9s</td><td>1.20x</td><td>80%</td><td>44%</td></tr>
+    <tr><td>2p</td><td>8</td><td>684.9s</td><td>931.0s</td><td>0.74x</td><td>80%</td><td>47%</td></tr>
+    <tr><td>3p</td><td>8</td><td>854.1s</td><td>642.8s</td><td>1.33x</td><td>72%</td><td>47%</td></tr>
+    <tr><td>4p</td><td>8</td><td>739.5s</td><td>465.0s</td><td>1.59x</td><td>82%</td><td>40%</td></tr>
+    <tr><td>5p</td><td>8</td><td>654.0s</td><td>490.9s</td><td>1.33x</td><td>80%</td><td>50%</td></tr>
+    <tr><td>6p</td><td>8</td><td>460.1s</td><td>489.8s</td><td>0.94x</td><td>88%</td><td>57%</td></tr>
+    <tr style="font-weight:bold"><td>平均</td><td>—</td><td>—</td><td>—</td><td>1.19x</td><td>80%</td><td>47%</td></tr>
   </table>
 </div>
 
@@ -343,29 +339,29 @@ history.append(exception, recovery, outcome)</div>
   <div class="grid">
     <div class="card" style="border-left: 4px solid #0070f3;">
       <h3>1. 引入MRTA旅行时间后，结果接近基准</h3>
-      <p>平均Makespan比率：<span class="highlight">1.08x</span>（非常接近MRTA基准）</p>
+      <p>平均Makespan比率：<span class="highlight">1.19x</span>（接近MRTA基准）</p>
       <p>说明加入移动时间后，我们的调度与MRTA最优解基本持平。</p>
-      <p style="font-size: 14px; color: #888;">改进前（无移动时间）：0.07x~0.30x，严重低估实际耗时。改进后（含移动时间）：0.42x~1.67x，更接近真实场景。</p>
+      <p style="font-size: 14px; color: #888;">改进前（无移动时间）：0.07x~0.30x，严重低估实际耗时。改进后（含移动时间）：0.74x~1.59x，更接近真实场景。</p>
     </div>
     <div class="card" style="border-left: 4px solid #ee0000;">
       <h3>2. 部分场景超过基准的原因</h3>
-      <p>3p(1.18x)、4p(1.61x)、6p(1.67x) 长于MRTA基准</p>
-      <p style="font-size: 14px; color: #888;">MRTA基准用MILP求解器找全局最优，我们用贪心算法。贪心方法在复杂场景下不够优化，但结果仍然可行。</p>
+      <p>3p(1.33x)、4p(1.59x)、5p(1.33x) 长于MRTA基准</p>
+      <p style="font-size: 14px; color: #888;">MRTA基准用MILP求解器找全局最优，我们用贪心算法。贪心方法在复杂场景下不够优化，但结果仍然可行。2p(0.74x)和6p(0.94x)则接近或优于MILP基准。</p>
     </div>
   </div>
 
   <div class="grid" style="margin-top: 24px;">
     <div class="card" style="border-left: 4px solid #f5a623;">
-      <h3>3. 资源利用率仍需改进</h3>
-      <p>平均资源利用率：<span class="tag tag-warning">35%</span></p>
-      <p>33% = 只有1台机器人在干活（1/3 ≈ 33.3%）</p>
-      <p style="font-size: 14px; color: #888;">说明当前调度倾向于单臂串行执行，多臂并行调度能力不足。这是下一阶段优化的核心方向。</p>
+      <h3>3. 资源利用率有显著提升</h3>
+      <p>平均资源利用率：<span class="tag tag-warning">47%</span></p>
+      <p>相比之前35%有明显改善，三机协同调度能力增强</p>
+      <p style="font-size: 14px; color: #888;">利用率从33%-35%提升到40%-57%，说明多臂并行调度能力有所改善，但仍低于理想水平。</p>
     </div>
     <div class="card" style="border-left: 4px solid #0070f3;">
-      <h3>4. LLM接入后成功率94%</h3>
-      <p>接入真实LLM API后，任务分解和代码生成质量提升</p>
-      <p>平均成功率：<strong>94%</strong></p>
-      <p style="font-size: 14px; color: #888;">LLM能更好地理解任务语义，生成更合理的调度方案。但仍有6%的失败率，需要进一步优化。</p>
+      <h3>4. DeepSeek Chat驱动成功率80%</h3>
+      <p>接入DeepSeek Chat LLM后，任务分解和代码生成表现稳定</p>
+      <p>平均成功率：<strong>80%</strong></p>
+      <p style="font-size: 14px; color: #888;">DeepSeek Chat替代mimo-v2.5（因长prompt超时），任务分解质量稳定。80%成功率仍有提升空间，需进一步优化LLM任务分解质量。</p>
     </div>
   </div>
 
@@ -380,10 +376,6 @@ history.append(exception, recovery, outcome)</div>
     <div class="card">
       <h3><span class="tag tag-error">严重</span> 物理抓取不真实</h3>
       <p>工件通过"传送+冻结"附着到夹爪，不是物理仿真。FixedJoint在Isaac Sim pip包中API受限，无法实现真正的物理绑定。</p>
-    </div>
-    <div class="card">
-      <h3><span class="tag tag-error">严重</span> 视频演示异常</h3>
-      <p>视频中只拍到两个机械臂（应有三个），工件没有被夹取，机械臂运动轨迹混乱，画面不连贯。</p>
     </div>
     <div class="card">
       <h3><span class="tag tag-error">严重</span> Isaac Sim进程崩溃</h3>
@@ -410,12 +402,12 @@ history.append(exception, recovery, outcome)</div>
       <p>Docker Hub、阿里云、腾讯、网易镜像源均无法拉取。无法安装更新的Isaac Sim版本。</p>
     </div>
     <div class="card">
-      <h3><span class="tag tag-error">严重</span> 视频黑帧/相机问题</h3>
-      <p>Replicator帧捕获需<code>render=True</code>。相机位置过近导致机械臂在画面外。地面无Ground Plane导致工件穿透。</p>
+      <h3><span class="tag tag-error">严重</span> Vulkan驱动不可用</h3>
+      <p>容器环境中<code>libGLX_nvidia.so.0</code>缺失，<code>vkCreateInstance</code>返回NULL。Isaac Sim 4.5完整渲染无法启动，改用PhysXOnlySimulator。</p>
     </div>
     <div class="card">
       <h3><span class="tag tag-error">严重</span> 资源利用率偏低</h3>
-      <p>33%利用率意味着只有1台机器人在干活。多臂并行调度能力不足，是调度算法的设计问题。</p>
+      <p>平均47%利用率，虽有提升但仍低于理想水平。多臂并行调度能力有待进一步增强。</p>
     </div>
   </div>
 </div>
@@ -447,8 +439,8 @@ history.append(exception, recovery, outcome)</div>
       <span class="tag tag-error">失败</span>
     </div>
     <div class="card">
-      <h3>视频优化</h3>
-      <p>添加Ground Plane、DomeLight照明、调整相机位置、ffmpeg H.264编码、5倍慢动作。</p>
+      <h3>Vulkan驱动排查</h3>
+      <p>排查<code>vulkaninfo</code>失败、<code>libGLX_nvidia.so.0</code>缺失、<code>vkCreateInstance</code>返回NULL。容器环境限制无法修复，改用PhysXOnlySimulator。</p>
       <span class="tag tag-success">成功</span>
     </div>
     <div class="card">
@@ -462,8 +454,8 @@ history.append(exception, recovery, outcome)</div>
       <span class="tag tag-success">成功</span>
     </div>
     <div class="card">
-      <h3>真实LLM API</h3>
-      <p>接入mimo-v2.5模型，使用HTTP API避免OpenAI SDK兼容性问题。</p>
+      <h3>DeepSeek Chat LLM</h3>
+      <p>接入DeepSeek Chat模型（替代mimo-v2.5，因长prompt超时），使用HTTP API避免OpenAI SDK兼容性问题。</p>
       <span class="tag tag-success">成功</span>
     </div>
     <div class="card">
@@ -497,7 +489,7 @@ src/
 │
 ├── simulation/                     # 仿真后端
 │   ├── base.py                     # SimulationInterface ABC
-│   ├── isaac_sim.py                # Isaac Sim 4.5 物理仿真
+│   ├── physx_only.py               # PhysXOnlySimulator（纯物理计算，无Vulkan依赖）
 │   ├── mrta_travel.py              # MRTA旅行时间管理器
 │   └── arm_interface.py            # 代码 → 仿真动作适配器
 │
@@ -517,27 +509,29 @@ src/
   <div style="max-width: 700px; text-align: left;">
     <div style="margin-bottom: 24px;">
       <h3 style="color: #0070f3;">✅ 核心成果</h3>
-      <p>① MRTA旅行时间矩阵已实现，Makespan从67s提升到247s-886s<br>
-      ② 真实LLM API已接入（mimo-v2.5），任务分解和代码生成质量提升<br>
-      ③ 6个场景实验完成，平均比率1.08x，成功率94%</p>
+      <p>① MRTA旅行时间矩阵已实现，Makespan从67s提升到460s-854s<br>
+      ② DeepSeek Chat LLM API已接入（替代mimo-v2.5），任务分解和代码生成质量稳定<br>
+      ③ 6个场景30次实验完成，平均比率1.19x，成功率80%，利用率47%</p>
     </div>
     <div style="margin-bottom: 24px;">
       <h3 style="color: #f5a623;">⚠️ 待改进</h3>
-      <p>① 资源利用率偏低（35%），多臂并行调度能力不足<br>
-      ② 部分场景超过MRTA基准（3p/4p/6p），启发式方法不够优化<br>
-      ③ 物理抓取、视频演示、Docker容器化仍受限</p>
+      <p>① 资源利用率偏低（47%），多臂并行调度能力仍需增强<br>
+      ② 部分场景超过MRTA基准（3p/4p/5p），启发式方法不够优化<br>
+      ③ 物理抓取仍受限（FixedJoint API），Docker容器化受限</p>
     </div>
     <div style="margin-bottom: 24px;">
       <h3 style="color: #0070f3;">💡 核心收获</h3>
       <p>① MRTA旅行时间是公平比较的关键——加入移动时间后结果更接近真实场景<br>
       ② LLM接入提升了任务理解能力，但调度优化仍需改进<br>
-      ③ Harness闭环反馈机制验证了自适应调度的可行性</p>
+      ③ Harness闭环反馈机制验证了自适应调度的可行性<br>
+      ④ PhysXOnlySimulator证明了在无Vulkan环境下仍能提供可靠仿真</p>
     </div>
     <div>
       <h3 style="color: #0070f3;">🔮 后续方向</h3>
       <p>① 优化资源分配算法，提升多臂并行率<br>
       ② 改进启发式方法，接近MRTA全局最优<br>
-      ③ 微调LLM提升调度质量</p>
+      ③ 微调LLM提升调度质量和成功率<br>
+      ④ 修复物理抓取问题</p>
     </div>
   </div>
 

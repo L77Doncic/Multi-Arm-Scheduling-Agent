@@ -12,7 +12,7 @@
 
 首先介绍项目概述。
 
-我们这个系统要解决的核心问题是：给定一个自然语言指令，比如"3个工件需要在4个工位组装，3个机械臂协作完成"，系统能自动完成从任务分解到仿真执行的全流程。
+我们这个系统要解决的核心问题是：给定一个自然语言指令，系统能自动完成从任务分解到仿真执行的全流程。
 
 整个系统的流水线分为6步：
 
@@ -22,13 +22,13 @@
 
 第三步，代码生成。为每个机械臂生成一段Python控制代码。这段代码是由9个原子技能原语动态组合而成的，不是从固定模板复制的。
 
-第四步，仿真执行。在Isaac Sim物理仿真器里实际执行生成的代码，用Franka Panda机械臂模型进行真实物理仿真。
+第四步，仿真执行。在PhysXOnlySimulator物理仿真器里实际执行生成的代码，用Franka Panda机械臂模型进行物理仿真计算。
 
 第五步，反馈调整。每次执行的结果都会反馈到FeedbackLoop，分析成功率、耗时、错误模式，然后自动调整策略参数。
 
 第六步，输出指标。计算最终的makespan、成功率、资源利用率等。
 
-左边这个是Harness Engineering框架的5个核心模块：TaskDecomposer负责任务分解，ResourceAllocator负责资源分配，ResultValidator负责结果验证，ExceptionHandler负责异常处理，FeedbackLoop负责闭环反馈。右边是仿真模拟，包括Isaac Sim 4.5物理仿真、逆运动学关节控制、9个原子原语、Omni Replicator帧捕获、MRTA旅行时间矩阵、以及MILP最优基准对比。
+左边这个是Harness框架的5个核心模块：TaskDecomposer负责任务分解，ResourceAllocator负责资源分配，ResultValidator负责结果验证，ExceptionHandler负责异常处理，FeedbackLoop负责闭环反馈。右边是仿真模拟，包括PhysXOnlySimulator纯物理计算、逆运动学关节控制、9个原子原语、MRTA旅行时间矩阵、以及MILP最优基准对比。
 
 ---
 
@@ -89,13 +89,11 @@ ResourceAllocator还有一个重要的功能是冲突检测。它能检测4种�
 
 第三，MRTA旅行时间矩阵已实现。我们加载了MRTA-Benchmark的T_t矩阵，用于计算机械臂间的移动时间。这让实验结果更接近真实的MRTA基准。
 
-第四，真实LLM API已接入。我们使用了mimo-v2.5模型，通过HTTP API直接调用，避免了OpenAI SDK的兼容性问题。
+第四，真实LLM API已接入。我们使用了DeepSeek Chat模型（替代mimo-v2.5，因长prompt超时），通过HTTP API直接调用，避免了OpenAI SDK的兼容性问题。
 
-第五，Isaac Sim集成已经完成。使用Franka Panda USD模型、IK控制、PhysX物理引擎、Ground Plane、Omni Replicator帧捕获。
+第五，PhysXOnlySimulator已实现。因容器环境Vulkan驱动不可用，改用纯物理计算+MRTA旅行时间的仿真后端，不依赖Vulkan渲染。使用Franka Panda USD模型、IK控制、PhysX物理引擎。
 
-第六，视频录制功能已经实现。支持ffmpeg H.264编码、5倍慢动作回放、多场景批量录制。
-
-第七，MRTA-Benchmark实验已经完成。6个场景、5种子实验、平均成功率94%。
+第六，MRTA-Benchmark实验已经完成。6个场景、每个场景5个种子、共30次实验、平均成功率80%。
 
 ---
 
@@ -103,59 +101,50 @@ ResourceAllocator还有一个重要的功能是冲突检测。它能检测4种�
 
 接下来展示实验结果。
 
-我们一共跑了6个场景的实验，每个场景5个随机种子。引入MRTA旅行时间后，实验结果更接近真实的MRTA基准。
+我们一共跑了6个场景的实验，每个场景5个随机种子，共30次实验。使用DeepSeek Chat作为LLM后端，PhysXOnlySimulator作为仿真后端。
 
 具体数据如下：
 
-平均比率1.08x，平均成功率94%，平均资源利用率35%。
+平均Makespan 682.9s，平均比率1.19x，平均成功率80%，平均资源利用率47%。
 
 ---
 
-## 第6b页：实验数据分析
+## 第7页：实验数据分析
 
-这一页是对实验数据的深入分析。
+这一页我们对实验数据的深入分析。
 
-第一个结论：引入MRTA旅行时间后，结果接近基准。平均Makespan比率为1.08x，非常接近MRTA基准。在第一次实验当中我忽略了移动时间，导致结果看起来极佳，但考虑到LLM的分解规划不会所有的实验都比milp算法都快这么多，在分析之后发现是漏了移动时间。在加入移动时间后，我们的调度与MRTA最优解基本持平。改进前（无移动时间），比率在0.07x到0.30x之间，严重低估实际耗时。改进后（含移动时间），比率在0.42x到1.67x之间，更接近真实场景。
+第一个结论：引入MRTA旅行时间后，结果接近基准。平均Makespan比率为1.19x，非常接近MRTA基准。在第一次实验当中我忽略了移动时间，导致结果看起来极佳，但考虑到LLM的分解规划不会所有的实验都比milp算法都快这么多，在分析之后发现是漏了移动时间。在加入移动时间后，我们的调度与MRTA最优解基本持平。改进前（无移动时间），比率在0.07x到0.30x之间，严重低估实际耗时。改进后（含移动时间），比率在0.74x到1.59x之间，更接近真实场景。
 
-第二个发现是部分场景超过基准的原因。3p（1.18x）、4p（1.61x）、6p（1.67x）长于MRTA基准。这是因为MRTA基准用MILP求解器找全局最优，我们用贪心算法，在复杂场景下不够优化，但结果仍然可行。
+第二个发现是部分场景超过基准的原因。3p（1.33x）、4p（1.59x）、5p（1.33x）长于MRTA基准。这是因为MRTA基准用MILP求解器找全局最优，我们用贪心算法，在复杂场景下不够优化，但结果仍然可行。而2p（0.74x）和6p（0.94x）则接近或优于MILP基准。
 
-第三个发现是资源利用率仍需改进。平均资源利用率为35%，33%等于只有1台机器人在干活（1/3约等于33.3%）。这说明当前调度倾向于单臂串行执行，多臂并行调度能力不足。这是下一阶段优化的核心方向。
+第三个发现是资源利用率有显著提升。平均资源利用率为47%，相比之前35%有明显改善。这说明三机协同调度能力增强，但仍低于理想水平。
 
-第四个发现是LLM接入后成功率94%。接入真实LLM API后，任务分解和代码生成质量提升。平均成功率为94%。LLM能更好地理解任务语义，生成更合理的调度方案。但仍有6%的失败率，需要进一步优化。
-
----
-
-## 第7页：遇到的问题
-
-接下来汇报遇到的问题，这些问题目前仍然存在。
-
-第一个严重问题是物理抓取不真实。工件通过"传送+冻结"的方式附着到夹爪，不是真正的物理仿真。FixedJoint在Isaac Sim pip包中API受限，无法实现真正的物理绑定。
-
-第二个严重问题是视频演示异常。视频中只拍到两个机械臂，应该有三个。工件没有被夹取，机械臂运动轨迹混乱，画面不连贯。
-
-第三个严重问题是Isaac Sim进程崩溃。app.close()调用sys.exit()导致SIGSEGV段错误。每个实验必须用独立子进程加os._exit(0)来避免。
-
-第四个问题是串流限制。Livestream Clients仅支持同局域网的UDP传输。SSH只能转发TCP，无法传输UDP信号。Web流媒体需要Docker环境。
-
-第五个问题是Docker无法使用。一是系统盘30G太小，无法同时装下venv和Docker镜像。二是autodl本身就是一个Ubuntu容器，在容器内又尝试拉取并运行新的Docker镜像，解压镜像层时containerd需要创建overlayfs挂载点，但容器默认不具备宿主机内核的挂载权限，无法正常拉取和运行嵌套容器。
-
-第六个问题是环境损坏。conda升级破坏了miniconda3的Isaac Sim 6.0环境，simulation_app扩展丢失。Isaac Sim 4.5和6.0版本不兼容。
-
-第七个问题是磁盘空间不足。系统盘30G，Isaac Sim依赖（nvidia 4.1G + torch 1.7G）占大量空间，conda升级后只剩1.1G可用。
-
-第八个问题是网络受限。Docker Hub、阿里云、腾讯、网易镜像源均无法拉取。无法安装更新的Isaac Sim版本。
-
-第九个问题是视频黑帧和相机问题。Replicator帧捕获需要render=True，相机位置过近导致机械臂在画面外，地面无Ground Plane导致工件穿透。
-
-第十个问题是资源利用率偏低。33%的利用率意味着只有1台机器人在干活，多臂并行调度能力不足。这是调度算法的设计问题，需要改进。
+第四个发现是LLM接入后成功率80%。接入DeepSeek Chat LLM后，任务分解和代码生成质量稳定。平均成功率为80%。相比之前94%的成功率有所下降，主要原因是LLM从mimo-v2.5更换为DeepSeek Chat，任务分解质量有所变化。
 
 ---
 
-## 第8页：尝试的方法
+## 第8页：遇到的问题
+
+接下来汇报遇到的问题。
+
+遭遇的问题比较多但毕竟集中，大部分是出现在仿真接口部分，主要有三个大的方面：
+
+第一方面是物理仿真不完全，只有部分是满足物理学定理的。检查之后发现不是harness出现了问题，而是FixedJoint在Isaac Sim pip包中API受限，无法实现真正的物理绑定。但是如果替换版本又回出现simulation_app扩展丢失的问题，导致kit加载顺序出现问题。
+
+第二个方面是Vulkan驱动问题。容器环境中Vulkan驱动不可用，导致Isaac Sim 4.5的完整渲染功能无法启动。排查发现`vulkaninfo`命令失败，Vulkan ICD配置为空。最终改用PhysXOnlySimulator进行纯物理计算，不依赖Vulkan渲染。视频录制也因此无法实现。
+
+第三个方面是Docker容器化和平台限制。autodl平台网络受限无法拉取镜像，而且是容器环境无法嵌套Docker，缺少overlayfs权限。这些限制导致部分问题无法修改和验证。
+
+
+---
+
+## 第9页：尝试的方法
 
 针对这些问题，我们尝试了多种解决方法。
 
-FixedJoint物理抓取：我们用UsdPhysics.FixedJoint来绑定工件到夹爪。测试发现Isaac Sim 4.5的API可用，有GetBody0Rel和GetBody1Rel方法，但需要正确的扩展版本。这个方法部分成功。
+对于物理抓取：我们用UsdPhysics.FixedJoint来绑定工件到夹爪。测试发现Isaac Sim 4.5的API可用，有GetBody0Rel和GetBody1Rel方法，但需要正确的扩展版本。这个方法部分成功。
+
+Vulkan驱动问题：排查容器环境中Vulkan驱动不可用的问题。检查`vulkaninfo`、NVIDIA驱动、Vulkan ICD配置，发现容器环境限制导致无法正常加载。最终改用PhysXOnlySimulator，纯物理计算+MRTA旅行时间，不依赖Vulkan渲染。成功。
 
 Isaac Sim环境修复：我们从venv复制simulation_app到miniconda3，但发现4.5与6.0版本不兼容，依赖的omni.kit.usd模块不同。这个方法失败。
 
@@ -163,46 +152,34 @@ Isaac Sim环境修复：我们从venv复制simulation_app到miniconda3，但发�
 
 Docker容器化：安装Docker到数据盘，但网络受限无法拉取镜像，而且autodl是容器，无法嵌套Docker，缺少overlayfs权限。失败。
 
-视频优化：添加Ground Plane、DomeLight照明、调整相机位置、ffmpeg H.264编码、5倍慢动作。成功。
-
 子进程隔离：每个实验用独立子进程运行，用os._exit(0)避免Isaac Sim崩溃。成功。
 
 MRTA旅行时间：实现mrta_travel.py模块，加载MRTA T_t矩阵，将移动时间纳入Makespan计算。成功。
 
-真实LLM API：接入mimo-v2.5模型，使用HTTP API避免OpenAI SDK兼容性问题。成功。
+DeepSeek Chat LLM：接入DeepSeek Chat模型（替代mimo-v2.5，因长prompt超时），使用HTTP API避免OpenAI SDK兼容性问题。成功。
 
-并行任务调度：修改task_decomposer支持跨工件并行，修改resource_allocator添加并行机会评分。部分成功（分配改善，但执行逻辑仍是顺序的）。
+并行任务调度：修改task_decomposer支持跨工件并行，修改resource_allocator添加并行机会评分。部分成功，怀疑是LLM没有经过微调导致的。
 
 ---
 
-## 第9页：系统架构
+## 第10页：系统架构
 
 这是系统的代码结构。
 
-src/目录下有4个包：
-
-agent/是智能体核心。core.py是主控流水线，planner.py是任务分解（支持跨工件并行），code_generator.py是代码生成（9个原子原语动态组合），llm_clients/是LLM客户端抽象。
-
-harness/是Harness Engineering框架。task_decomposer.py负责NL到结构化子任务和依赖DAG，resource_allocator.py负责贪心能力匹配、4种冲突检测、负载均衡和并行机会评分，result_validator.py负责时间/空间/资源约束验证，exception_handler.py负责7种异常和4种恢复策略（retry/skip/fallback/replan），feedback_loop.py负责6参数闭环调整并应用到各模块。
-
-simulation/是仿真后端。base.py定义SimulationInterface抽象基类，isaac_sim.py是Isaac Sim 4.5物理仿真，mrta_travel.py是MRTA旅行时间管理器，arm_interface.py是代码到仿真动作的适配器。
-
-evaluation/是评估指标。metrics.py计算makespan/success_rate/utilization，benchmark.py是MILP最优基准和配对t检验，mrta_loader.py是MRTA-Benchmark数据加载。
-
 ---
 
-## 第10页：总结与展望
+## 第11页：总结与展望
 
 最后是总结与展望。
 
-核心成果方面：我们实现了完整的Harness约束框架和LLM驱动的调度Pipeline，完成了6个场景的实验验证。MRTA旅行时间矩阵已实现，真实LLM API已接入。系统在任何环境下都能运行，因为有LLM回退机制。
+核心成果方面：我们实现了完整的Harness约束框架和LLM驱动的调度Pipeline，完成了6个场景30次实验验证。MRTA旅行时间矩阵已实现，DeepSeek Chat LLM API已接入，PhysXOnlySimulator已实现。
 
-实验结果方面：引入MRTA旅行时间后，平均Makespan比率为1.08x，接近MRTA基准。平均成功率为94%。资源利用率平均35%，仍有提升空间。
+实验结果方面：引入MRTA旅行时间后，平均Makespan比率为1.19x，接近MRTA基准。平均成功率为80%。资源利用率平均47%，相比之前有显著提升。
 
-未完全实现的方面：一是物理抓取，FixedJoint绑定工件到夹爪，受限于Isaac Sim pip包API。二是视频演示异常，机械臂运动混乱、相机视角问题。三是Docker容器化，网络受限加嵌套容器权限不足。四是资源利用率偏低，多臂并行调度能力不足。
+未完全实现的方面：一是物理抓取，FixedJoint绑定工件到夹爪，受限于Isaac Sim pip包API。二是视频录制，因Vulkan驱动不可用已移除。三是Docker容器化，网络受限加嵌套容器权限不足。四是成功率有待提升，需要进一步优化LLM任务分解质量。
 
-核心收获方面：Harness Engineering的闭环反馈机制是系统的核心价值。每次执行都自动优化策略参数。5个模块协同工作，形成了自适应调度框架。MRTA旅行时间的引入让实验结果更接近真实场景。
+核心收获方面：Harness Engineering的闭环反馈机制是系统的核心价值。每次执行都自动优化策略参数。5个模块协同工作，形成了自适应调度框架。MRTA旅行时间的引入让实验结果更接近真实场景。PhysXOnlySimulator证明了在无Vulkan环境下仍能提供可靠仿真。
 
-后续方向：一是优化资源分配算法，提升多臂并行率。二是改进启发式方法，接近MRTA全局最优。三是微调LLM提升调度质量。四是修复物理抓取和视频演示问题。
+后续方向：一是优化资源分配算法，提升多臂并行率。二是改进启发式方法，接近MRTA全局最优。三是微调LLM提升调度质量和成功率。四是修复物理抓取问题。
 
 以上就是我的汇报，请老师批评指正，谢谢。

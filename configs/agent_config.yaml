@@ -5,9 +5,9 @@ llm:
   # Provider: openai, anthropic
   provider: "openai"
 
-  # Model selection (Xiaomi MiMo OpenAI-compatible API)
-  model: "mimo-v2.5"
-  api_base: "https://token-plan-cn.xiaomimimo.com/v1"
+  # Model selection (DeepSeek OpenAI-compatible API)
+  model: "deepseek-chat"
+  api_base: "https://api.deepseek.com"
   # API key: set via environment variable OPENAI_API_KEY
   # or create a .env file (see .env.example)
   api_key_env: "OPENAI_API_KEY"

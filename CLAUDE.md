@@ -67,6 +67,16 @@ Four packages under `src/`:
 - **Simulation backend abstraction**: All backends implement `SimulationInterface`. Switch via `--sim` flag or config — zero code changes in agent/harness.
 - **Closed-loop feedback**: Every task execution feeds back into `FeedbackLoop`, which adjusts strategy parameters before the next task. This is not optional — it's core to the system.
 - **9 atomic primitives**: Code generation composes from: move_to, grip, release, rotate, linear_move, wait, check_sensor, set_payload, set_compliance.
+- **Generated code execution**: `arm_interface.execute_generated_code()` uses Python `exec()` to run generated code, then discovers the `execute_*` function in the namespace and calls it with an `ArmInterface` instance. The generated code calls primitives like `arm_interface.move_to(...)` which translate to simulation actions.
+- **Code regeneration on failure**: When a task fails during execution, the system regenerates code with adjusted speed/force factors (speed ↓ 15%, force ↑ 10%) and retries up to `retry_count` times. This is driven by both the feedback loop's global adjustments and per-task regeneration in `core.py:_execute_tasks()`.
+- **Feedback adjustment routing**: The feedback loop adjusts 6 parameters routed to specific modules:
+  - `timeout_adjustment` → `resource_allocator`
+  - `retry_count` → `exception_handler`
+  - `resource_weight`, `priority_boost` → `resource_allocator`
+  - `code_gen_speed_factor`, `code_gen_force_factor` → `code_generator`
+  Each module accepts updates via `update_config()`.
+- **MRTA travel times**: Scenario JSON files include `mrta_travel_times` with `T_e` (execution times per task) and `T_t` (travel time matrix). These are loaded by `simulation/mrta_travel.py` and override task durations during execution, making results match the MRTA-Benchmark exactly.
+- **LLM client uses raw HTTP**: `SyncLLMClient` sends requests via `requests.post()` directly (not the OpenAI SDK client) to avoid serialization issues. It works with any OpenAI-compatible API endpoint.
 
 ## Configuration
 
@@ -90,11 +100,33 @@ API keys via environment variables or `.env` file (see `.env.example`):
 
 Tests use `sys.path.insert(0, ...)` to add `src/` to the path (not package imports). Test files are in `tests/unit/`. The end-to-end integration test in `test_basic.py` exercises the full pipeline with IsaacSimInterface.
 
+**Import convention**: Both scripts and tests add `src/` to `sys.path` at the top of the file:
+```python
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+```
+Then import directly: `from agent.core import SchedulingAgent`, `from harness.feedback_loop import FeedbackLoop`, etc. Do not use package-relative imports.
+
 ## Scenarios
 
 - `data/scenarios/1p_production_line.json`: 1 workpiece, 4 stations, 3 arms, MILP-optimal makespan 584.9s
 - `data/scenarios/2p_production_line.json` - `6p_production_line.json`: 2-6 workpieces, 4 stations, 3 arms
 - `data/datasets/MRTA-Benchmark/`: 13 APEX-MR LEGO assembly tasks (RSS 2025)
+
+**Scenario JSON structure**: Each scenario has two top-level keys:
+- `scenario`: contains `stations` (id, position, capabilities_required, operation, estimated_duration), `workpieces` (id, initial_position, operations_sequence), `robot_arms` (id, base_position, capabilities, max_payload), `constraints`, `instruction`, and `optimal_schedule` (MILP baseline).
+- `mrta_travel_times`: contains `T_e` (execution time per task), `T_t` (NxN travel time matrix), `task_locations`, and `precedence_constraints`. These are loaded by `simulation/mrta_travel.py` and used to override task durations during execution.
+
+## Operation Type Mapping
+
+The system maps natural-language operation types to simulation action types via `_ACTION_TYPE_MAP` in `core.py`. Key mappings:
+- `pick`, `pick_workpiece_from_feed`, `pick_brick` → `"pick"`
+- `place`, `package`, `output`, `drop` → `"place"`
+- `move`, `transfer`, `transport` → `"move"`
+- `assemble`, `final_assembly`, `join`, `press_brick` → `"assemble"`
+- `inspect`, `quality_inspection`, `verify` → `"inspect"`
+- `tighten`, `bolt` → `"move"` (mock doesn't have tighten)
+- `weld`, `solder` → `"assemble"`
+- Unknown types default to `"move"`.
 
 ## Documentation
 

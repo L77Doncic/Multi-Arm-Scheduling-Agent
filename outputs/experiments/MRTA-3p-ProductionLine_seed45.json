@@ -1,0 +1,14 @@
+{
+  "scenario": "MRTA-3p-ProductionLine",
+  "scenario_file": "3p_production_line.json",
+  "seed": 45,
+  "optimal_makespan": 642.81723,
+  "makespan": 1080.1722936614103,
+  "task_success_rate": 0.7142857142857143,
+  "resource_utilization": 0.4705208513402356,
+  "constraint_violations": 1,
+  "num_tasks": 14,
+  "video": null,
+  "backend": "physx_only",
+  "timestamp": "2026-06-26 01:56:06"
+}

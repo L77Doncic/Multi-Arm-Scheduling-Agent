@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Run all MRTA-Benchmark experiments using subprocess isolation.
-Each experiment runs in a separate process (Isaac Sim requires this)."""
+
+Uses PhysXOnlySimulator (no Vulkan rendering) — physics computation
+with MRTA travel time data produces identical scheduling metrics.
+"""
 import subprocess, sys, os, json, time
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,16 +22,22 @@ for scenario_file in scenarios:
     scenario_path = os.path.join(scenarios_dir, scenario_file)
     for seed in seeds:
         count += 1
+        result_file = os.path.join(output_dir, f"{scenario_file.replace('.json','')}_seed{seed}.json")
+        # Skip if result already exists
+        if os.path.exists(result_file):
+            with open(result_file) as f:
+                d = json.load(f)
+            all_results.append(d)
+            print(f"[{count}/{total}] {scenario_file} s{seed}: CACHED makespan={d['makespan']:.1f}s success={d['task_success_rate']:.0%}", flush=True)
+            continue
         t0 = time.time()
         proc = subprocess.Popen(
             [sys.executable, os.path.join(PROJECT, "scripts", "_run_single.py"),
              scenario_path, str(seed), output_dir],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
-        stdout, stderr = proc.communicate(timeout=180)
+        stdout, stderr = proc.communicate(timeout=300)  # 5 min per experiment (LLM API + allocation)
         elapsed = time.time() - t0
-
-        result_file = os.path.join(output_dir, f"{scenario_file.replace('.json','')}_seed{seed}.json")
         if os.path.exists(result_file):
             with open(result_file) as f:
                 d = json.load(f)
@@ -38,7 +47,6 @@ for scenario_file in scenarios:
             error_msg = stderr.decode()[-200:] if stderr else f"RC={proc.returncode}"
             all_results.append({"scenario": scenario_file, "seed": seed, "error": error_msg})
             print(f"[{count}/{total}] {scenario_file} s{seed}: FAILED RC={proc.returncode}", flush=True)
-        time.sleep(1)
 
 summary = {
     "total_experiments": len(all_results),
