@@ -401,7 +401,7 @@ class ResourceAllocator:
                 parallel_with_others += 1
 
         # KEY LOGIC: Prefer IDLE arms for parallel execution
-        # If this arm has fewer tasks, it's better for parallelism
+        # Calculate load based on task count (simplified)
         arm_load_penalty = len(arm_tasks) / max(len(assignment), 1)
 
         if parallel_with_others > 0:
@@ -564,10 +564,11 @@ class ResourceAllocator:
             total_duration = sum(
                 task_map[tid].estimated_duration for tid in task_ids if tid in task_map
             )
-            # If total duration exceeds the arm's effective capacity
-            # (derived from max_load), flag pairs for rebalancing
-            effective_capacity = arm.max_load * 10.0  # rough scaling
-            if total_duration > effective_capacity and len(task_ids) >= 2:
+            # Use average task duration as threshold for overload detection
+            # If an arm has more than 3x average duration, it's overloaded
+            avg_duration = total_duration / len(task_ids) if task_ids else 0
+            overload_threshold = avg_duration * 3.0  # 3x average = overloaded
+            if total_duration > overload_threshold and len(task_ids) >= 2:
                 # Flag the two lowest-priority tasks as conflicting
                 sorted_tids = sorted(
                     task_ids,
