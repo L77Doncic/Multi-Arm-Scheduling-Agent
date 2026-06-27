@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant NL as NL指令
+    participant TD as TaskDecomposer
+    participant RA as ResourceAllocator
+    participant CG as CodeGenerator
+    participant SIM as SimulationBackend
+    participant RV as ResultValidator
+    participant FL as FeedbackLoop
+    participant EH as ExceptionHandler
+    NL->>TD: decompose(instruction)
+    TD->>RA: List DecomposedTask
+    RA->>CG: Dict task_id, arm_id
+    CG->>SIM: Python code 9 primitives
+    SIM->>RV: ExecutionLog
+    RV->>FL: ValidationResult
+    FL->>FL: analyze_feedback()
+    FL->>RA: update_config params
+    FL->>CG: update_config params
+    SIM->>EH: exception on failure
+    EH->>SIM: RecoveryAction

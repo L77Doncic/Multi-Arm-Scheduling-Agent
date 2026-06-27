@@ -1,0 +1,24 @@
+graph TD
+NL["自然语言指令 + 场景配置"]
+TD["TaskDecomposer<br/>任务分解器"]
+RA["ResourceAllocator<br/>资源分配器"]
+CG["CodeGenerator<br/>代码生成器"]
+SIM["仿真执行引擎"]
+RV["ResultValidator<br/>结果验证器"]
+FL["FeedbackLoop<br/>反馈闭环"]
+EH["ExceptionHandler<br/>异常处理器"]
+NL --> TD
+TD -->|"子任务列表 + 依赖图"| RA
+RA -->|"任务-机械臂分配映射"| CG
+CG -->|"可执行代码"| SIM
+SIM -->|"执行日志"| RV
+RV -->|"验证结果"| FL
+SIM -.->|"执行异常"| EH
+EH -.->|"恢复动作"| SIM
+FL -->|"策略参数更新"| RA
+FL -->|"策略参数更新"| CG
+style TD fill:#e1f5fe
+style RA fill:#e8f5e9
+style RV fill:#fff3e0
+style FL fill:#fce4ec
+style EH fill:#f3e5f5

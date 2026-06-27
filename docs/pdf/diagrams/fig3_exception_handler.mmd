@@ -1,0 +1,14 @@
+graph TD
+FAIL["执行失败"] --> EH["ExceptionHandler.handle"]
+EH --> CLASSIFY["异常分类"]
+CLASSIFY --> CHECK{"重试次数 < 上限?"}
+CHECK -->|是| RETRY["RETRY: 重新执行<br/>speed 降低15%, force 升高10%"]
+CHECK -->|否| ESCALATE["策略升级"]
+ESCALATE --> RECOVERY{"原策略类型"}
+RECOVERY -->|RETRY| REPLAN["REPLAN: 返回资源分配"]
+RECOVERY -->|FALLBACK| FB["FALLBACK: 切换仿真后端"]
+RECOVERY -->|SKIP| SKIP["SKIP: 标记为 CANCELLED"]
+style EH fill:#f3e5f5
+style RETRY fill:#e8f5e9
+style REPLAN fill:#fff3e0
+style SKIP fill:#e1f5fe

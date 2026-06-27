@@ -1,0 +1,18 @@
+graph TD
+A["1. 加载场景配置 JSON"] --> B["2. 初始化 PhysXOnlySimulator"]
+B --> C["3. 加载场景至仿真器 load_scene"]
+C --> D["4. 调用 SchedulingAgent.execute_scheduling"]
+D --> D1["4.1 TaskPlanner 分解任务"]
+D1 --> D2["4.2 ResourceAllocator 分配资源"]
+D2 --> D3["4.3 CodeGenerator 生成代码"]
+D3 --> D4["4.4 仿真执行 PhysXOnlySimulator"]
+D4 --> D5["4.5 ResultValidator 验证结果"]
+D5 --> D6["4.6 FeedbackLoop 收集反馈"]
+D6 --> E["5. 计算评估指标 MetricsCalculator"]
+E --> F["6. 记录结果"]
+style D1 fill:#e1f5fe
+style D2 fill:#e8f5e9
+style D3 fill:#fff3e0
+style D4 fill:#fce4ec
+style D5 fill:#f3e5f5
+style D6 fill:#e0f7fa
